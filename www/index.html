@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2c3e50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="La Gran Familia">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>La Gran Familia</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ── Login Screen ── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">💰</div>
+    <h1>La Gran Familia</h1>
+    <p>Deli &amp; Market</p>
+    <div id="loginError"></div>
+    <div class="form-group" style="text-align:left;margin-top:8px">
+      <label>Username</label>
+      <input type="text" id="loginUser" autocapitalize="none" spellcheck="false" placeholder="username">
+    </div>
+    <div class="form-group" style="text-align:left">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="password">
+    </div>
+    <button class="btn btn-primary" onclick="App.login()">Sign In</button>
+  </div>
+</div>
+
+<!-- ── Main App ── -->
+<div id="app">
+
+  <header>
+    <div class="header-inner">
+      <div class="logo" onclick="App.nav('dashboard')">
+        <span class="logo-icon">💰</span>
+        <span class="logo-text">La Gran Familia<span class="logo-sub">Deli &amp; Market</span></span>
+      </div>
+      <span id="headerUser" class="header-user"></span>
+      <button class="hamburger" onclick="App.toggleNav()">☰</button>
+    </div>
+  </header>
+
+  <!-- Slide-in nav drawer -->
+  <div id="navOverlay" class="nav-overlay" onclick="App.closeNav()"></div>
+  <nav id="navDrawer" class="nav-drawer">
+    <div class="nav-drawer-header">
+      <div class="logo-text">La Gran Familia<span class="logo-sub">Deli &amp; Market</span></div>
+    </div>
+    <a class="nav-link active" data-page="dashboard"    onclick="App.nav('dashboard')"><span class="nav-icon">🏠</span><span data-t="dashboard">Dashboard</span></a>
+    <a class="nav-link admin-only" data-page="revenue"  onclick="App.nav('revenue')"><span class="nav-icon">💵</span><span data-t="revenue">Revenue</span></a>
+    <a class="nav-link admin-only" data-page="expenses" onclick="App.nav('expenses')"><span class="nav-icon">🧾</span><span data-t="expenses">Expenses</span></a>
+    <a class="nav-link admin-only" data-page="merchandise" onclick="App.nav('merchandise')"><span class="nav-icon">🛍️</span><span data-t="merchandise">Merchandise</span></a>
+    <a class="nav-link admin-only" data-page="employees" onclick="App.nav('employees')"><span class="nav-icon">👥</span><span data-t="employees">Employees</span></a>
+    <a class="nav-link" data-page="orders"              onclick="App.nav('orders')"><span class="nav-icon">📋</span><span data-t="orders">Orders</span></a>
+    <a class="nav-link admin-only" data-page="reports"  onclick="App.nav('reports')"><span class="nav-icon">📊</span><span data-t="reports">Reports</span></a>
+    <a class="nav-link admin-only" data-page="users"    onclick="App.nav('users')"><span class="nav-icon">👤</span>Users</a>
+    <a class="nav-link" data-page="settings"            onclick="App.nav('settings')"><span class="nav-icon">⚙️</span><span data-t="settings">Settings</span></a>
+    <a class="nav-link danger" style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.08);border-radius:0;margin-left:0;margin-right:0;padding-left:28px" onclick="App.logout()"><span class="nav-icon">🚪</span><span data-t="sign_out">Sign Out</span></a>
+  </nav>
+
+  <!-- Page content -->
+  <div id="pageContainer"></div>
+
+  <!-- Offline banner -->
+  <div id="offlineBanner">You're offline — showing saved data</div>
+
+</div>
+
+<script src="js/db.js"></script>
+<script src="js/translations.js"></script>
+<script src="js/pages/dashboard.js"></script>
+<script src="js/pages/revenue.js"></script>
+<script src="js/pages/expenses.js"></script>
+<script src="js/pages/merchandise.js"></script>
+<script src="js/pages/employees.js"></script>
+<script src="js/pages/orders.js"></script>
+<script src="js/pages/reports.js"></script>
+<script src="js/pages/users.js"></script>
+<script src="js/pages/settings.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

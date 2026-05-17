@@ -1,0 +1,15 @@
+{
+  "appId": "com.storeled.app",
+  "appName": "La Gran Familia",
+  "webDir": "www",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#1a2636",
+      "showSpinner": false
+    }
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}

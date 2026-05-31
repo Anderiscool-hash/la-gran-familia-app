@@ -1,6 +1,6 @@
 {
   "appId": "com.storeled.app",
-  "appName": "La Gran Familia",
+  "appName": "LGF Grocery",
   "webDir": "www",
   "plugins": {
     "SplashScreen": {

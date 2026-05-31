@@ -2,29 +2,28 @@ const settings = {
   async render() {
     const theme = localStorage.getItem('theme') || 'light';
     const lang  = localStorage.getItem('lang')  || 'en';
-    const user  = App.getUser();
 
     return `
     <div class="card">
-      <h2>⚙️ Settings</h2>
+      <h2>⚙️ ${t('settings')}</h2>
     </div>
 
     <div class="card">
-      <h2>🎨 Appearance</h2>
+      <h2>🎨 ${t('appearance')}</h2>
       <div class="setting-tiles">
         <div class="setting-tile ${theme==='light'?'active':''}" onclick="settings.setTheme('light')">
           <div class="tile-icon">☀️</div>
-          <div class="tile-label">Light</div>
+          <div class="tile-label">${t('light')}</div>
         </div>
         <div class="setting-tile ${theme==='dark'?'active':''}" onclick="settings.setTheme('dark')">
           <div class="tile-icon">🌙</div>
-          <div class="tile-label">Dark</div>
+          <div class="tile-label">${t('dark')}</div>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>🌐 Language</h2>
+      <h2>🌐 ${t('language')}</h2>
       <div class="setting-tiles">
         <div class="setting-tile ${lang==='en'?'active':''}" onclick="settings.setLang('en')">
           <div class="tile-icon">🇺🇸</div>
@@ -38,34 +37,25 @@ const settings = {
     </div>
 
     <div class="card">
-      <h2>📲 Install as App</h2>
-      <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">
-        This app works offline on your phone. Install it for the best experience.
-      </p>
+      <h2>📲 ${t('install_app')}</h2>
       <div id="install-android" style="display:none">
         <button class="btn btn-success" onclick="settings.installAndroid()" style="width:100%;margin-bottom:10px">
-          📲 Install on Android
+          📲 ${t('install_app')}
         </button>
       </div>
       <div id="install-ios" style="display:none;background:var(--surface-alt);border-radius:10px;padding:16px;border:1px solid var(--border)">
-        <p style="font-weight:600;color:var(--heading);margin-bottom:10px">Install on iPhone:</p>
         <ol style="margin:0 0 0 20px;line-height:2;font-size:14px;color:var(--text-muted)">
-          <li>Tap the <strong>Share</strong> button <span style="font-size:18px">⬆️</span></li>
+          <li>Tap <strong>Share ⬆️</strong></li>
           <li>Tap <strong>"Add to Home Screen"</strong></li>
           <li>Tap <strong>"Add"</strong></li>
         </ol>
       </div>
       <div id="install-done" style="display:none;color:#27ae60;font-weight:600;font-size:14px">
-        ✅ App is already installed!
+        ✅ ${t('install_app')}!
       </div>
     </div>
 
-    <div class="card">
-      <h2>👤 Account</h2>
-      <p style="margin-bottom:4px"><strong>${user?.name || 'User'}</strong></p>
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">@${user?.username || ''} · ${user?.role || ''}</p>
-      <button class="btn btn-danger" onclick="App.logout()" style="width:100%">🚪 Sign Out</button>
-    </div>`;
+    `;
   },
 
   mount() {
@@ -78,7 +68,6 @@ const settings = {
     } else if (window._installPrompt) {
       document.getElementById('install-android').style.display = 'block';
     } else {
-      // Generic: show both hints
       document.getElementById('install-ios').style.display = 'block';
     }
   },
@@ -92,12 +81,10 @@ const settings = {
   setLang(lang) {
     localStorage.setItem('lang', lang);
     applyTranslations();
-    App.nav('settings');
+    App.nav(App.getCurrentPage());
   },
 
   installAndroid() {
-    if (window._installPrompt) {
-      window._installPrompt.prompt();
-    }
+    if (window._installPrompt) window._installPrompt.prompt();
   }
 };

@@ -1,27 +1,16 @@
-// ── Core app shell ────────────────────────────────────────────────────────────
 const App = (() => {
-  let currentUser = null;
+  let currentPage = 'dashboard';
 
-  // ── Boot ──────────────────────────────────────────────────────────────────
+  // ── Boot ────────────────────────────────────────────────────────────────────
   async function boot() {
     await DB.open();
-    await DB.seedAdmin();
 
-    // Apply saved theme
     const theme = localStorage.getItem('theme') || 'light';
     document.getElementById('htmlRoot').dataset.theme = theme;
 
-    // Check saved session
-    const saved = sessionStorage.getItem('currentUser');
-    if (saved) {
-      currentUser = JSON.parse(saved);
-      showApp();
-      nav(currentUser.role === 'admin' ? 'dashboard' : 'orders');
-    } else {
-      showLogin();
-    }
+    applyTranslations();
+    nav('dashboard');
 
-    // Offline banner
     window.addEventListener('offline', () => {
       document.getElementById('offlineBanner').style.display = 'block';
     });
@@ -30,63 +19,11 @@ const App = (() => {
     });
   }
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  async function login() {
-    const username = document.getElementById('loginUser').value.trim().toLowerCase();
-    const password = document.getElementById('loginPass').value;
-    const users = await DB.getAll('users');
-    const user  = users.find(u => u.username === username && u.password === password);
-    if (!user) {
-      const el = document.getElementById('loginError');
-      el.textContent = 'Wrong username or password.';
-      el.style.display = 'block';
-      return;
-    }
-    currentUser = user;
-    sessionStorage.setItem('currentUser', JSON.stringify(user));
-    showApp();
-    nav(user.role === 'admin' ? 'dashboard' : 'orders');
-  }
-
-  function logout() {
-    currentUser = null;
-    sessionStorage.removeItem('currentUser');
-    closeNav();
-    showLogin();
-  }
-
-  function showLogin() {
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
-    document.getElementById('loginUser').value = '';
-    document.getElementById('loginPass').value = '';
-    document.getElementById('loginError').style.display = 'none';
-  }
-
-  function showApp() {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('headerUser').textContent = currentUser.name;
-
-    // Show/hide admin-only nav items
-    document.querySelectorAll('.admin-only').forEach(el => {
-      el.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
-    });
-
-    applyTranslations();
-  }
-
-  // ── Navigation ────────────────────────────────────────────────────────────
+  // ── Navigation ──────────────────────────────────────────────────────────────
   async function nav(page) {
     closeNav();
+    currentPage = page;
 
-    // Guard workers
-    const adminPages = ['dashboard','revenue','expenses','merchandise','employees','reports','users'];
-    if (adminPages.includes(page) && currentUser?.role !== 'admin') {
-      page = 'orders';
-    }
-
-    // Mark active
     document.querySelectorAll('.nav-link[data-page]').forEach(a => {
       a.classList.toggle('active', a.dataset.page === page);
     });
@@ -94,7 +31,7 @@ const App = (() => {
     const container = document.getElementById('pageContainer');
     container.innerHTML = '<div class="loading">Loading…</div>';
 
-    const pages = { dashboard, revenue, expenses, merchandise, employees, orders, reports, users, settings };
+    const pages = { dashboard, revenue, expenses, merchandise, employees, reports, settings };
     if (pages[page]) {
       container.innerHTML = await pages[page].render();
       if (pages[page].mount) pages[page].mount();
@@ -116,8 +53,8 @@ const App = (() => {
     document.getElementById('navOverlay').style.display = 'none';
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  function getUser() { return currentUser; }
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function getCurrentPage() { return currentPage; }
 
   function fmtMoney(n) {
     return '$' + (+n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -139,23 +76,7 @@ const App = (() => {
     return { monday, sunday };
   }
 
-  function card(title, content) {
-    return `<div class="card"><h2>${title}</h2>${content}</div>`;
-  }
+  document.addEventListener('DOMContentLoaded', boot);
 
-  function btn(label, cls, onclick) {
-    return `<button class="btn ${cls}" onclick="${onclick}">${label}</button>`;
-  }
-
-  // ── Login enter key ───────────────────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', () => {
-    ['loginUser','loginPass'].forEach(id => {
-      document.getElementById(id).addEventListener('keydown', e => {
-        if (e.key === 'Enter') login();
-      });
-    });
-    boot();
-  });
-
-  return { login, logout, nav, toggleNav, closeNav, getUser, fmtMoney, fmtDate, weekBounds, card, btn };
+  return { nav, toggleNav, closeNav, getCurrentPage, fmtMoney, fmtDate, weekBounds };
 })();

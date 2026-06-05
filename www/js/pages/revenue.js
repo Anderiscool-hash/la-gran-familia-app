@@ -1,98 +1,86 @@
 const revenue = {
   async render() {
-    const rows = await DB.getAll('revenue');
-    rows.sort((a,b) => new Date(b.weekStart) - new Date(a.weekStart));
-    const total      = rows.reduce((s,r) => s + (+r.amount), 0);
-    const totalCash  = rows.reduce((s,r) => s + (+r.cash || 0), 0);
-    const totalCredit= rows.reduce((s,r) => s + (+r.credit || 0), 0);
+    const rows = (await DB.getAll('revenue')).sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
+    const total  = rows.reduce((s, r) => s + (+r.amount), 0);
+    const cash   = rows.reduce((s, r) => s + (+r.cash || 0), 0);
+    const credit = rows.reduce((s, r) => s + (+r.credit || 0), 0);
+    const splitTotal = cash + credit || 1;
 
-    const today = new Date();
-    const mon = new Date(today);
-    mon.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
-    const defaultWeek = mon.toISOString().slice(0,10);
-
-    return `
-    <div class="card">
-      <h2>💵 ${t('revenue')}</h2>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-        <div class="stat-card revenue"><h3>${t('total_all_time')}</h3><div class="value">${App.fmtMoney(total)}</div></div>
-        <div class="stat-card" style="background:linear-gradient(135deg,#11998e,#38ef7d)"><h3>💵 ${t('cash')}</h3><div class="value">${App.fmtMoney(totalCash)}</div></div>
-        <div class="stat-card" style="background:linear-gradient(135deg,#4facfe,#00f2fe)"><h3>💳 ${t('credit_card')}</h3><div class="value">${App.fmtMoney(totalCredit)}</div></div>
+    return `<div class="page">
+      <div class="card rise" style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="metric-label">${t('total_all_time')} · ${t('revenue')}</div>
+            <span class="money c-text" style="font-size:32px;display:block;margin-top:6px">${App.fmtMoney(total)}</span>
+          </div>
+          <div class="iconchip t-pos" style="width:42px;height:42px">${icon('revenue', { size: 22 })}</div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:6px">
+            <span>${t('cash_split')}</span>
+            <span class="num">${Math.round(cash / splitTotal * 100)}% / ${Math.round(credit / splitTotal * 100)}%</span>
+          </div>
+          <div class="flow-bar"><span style="flex:${cash};background:var(--pos)"></span><span style="flex:${credit};background:var(--info)"></span></div>
+        </div>
+        <div style="display:flex;gap:10px">
+          ${substat('cash', 'cash', cash, 'c-pos')}
+          ${substat('card', 'card', credit, 'c-info')}
+        </div>
       </div>
 
-      <form onsubmit="revenue.add(event)" style="background:var(--surface-alt);border-radius:8px;padding:14px;margin-bottom:20px;border:1px solid var(--border)">
-        <h3 style="font-size:15px;margin-bottom:12px">${t('add_revenue')}</h3>
-        <div class="form-group">
-          <label>${t('week_starting')}</label>
-          <input type="date" id="rev-week" value="${defaultWeek}" required>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="form-group">
-            <label>💵 ${t('cash')} ($)</label>
-            <input type="number" id="rev-cash" step="0.01" min="0" placeholder="0.00" oninput="revenue.calcTotal()">
-          </div>
-          <div class="form-group">
-            <label>💳 ${t('credit_card')} ($)</label>
-            <input type="number" id="rev-credit" step="0.01" min="0" placeholder="0.00" oninput="revenue.calcTotal()">
-          </div>
-        </div>
-        <div style="background:var(--th-bg);border-radius:8px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:600;color:var(--heading)">${t('total')}</span>
-          <span id="rev-total-display" style="font-size:20px;font-weight:700;color:#27ae60">$0.00</span>
-        </div>
-        <div class="form-group">
-          <label>${t('notes')}</label>
-          <input type="text" id="rev-notes" placeholder="…">
-        </div>
-        <button type="submit" class="btn btn-success" style="width:100%">${t('save_revenue')}</button>
-      </form>
+      <button class="btn btn-brand btn-full" onclick="App.openForm('revenue')">${icon('plus', { size: 18 })}${t('add_revenue')}</button>
 
-      ${rows.length ? `<table><thead><tr>
-        <th>${t('date')}</th>
-        <th>💵 ${t('cash')}</th>
-        <th>💳 ${t('credit_card')}</th>
-        <th>${t('total')}</th>
-        <th></th>
-      </tr></thead><tbody>
-        ${rows.map(r=>`<tr>
-          <td>${App.fmtDate(r.weekStart)}</td>
-          <td style="color:#27ae60">${App.fmtMoney(r.cash || 0)}</td>
-          <td style="color:#2980b9">${App.fmtMoney(r.credit || 0)}</td>
-          <td style="font-weight:700">${App.fmtMoney(r.amount)}</td>
-          <td><button class="btn btn-danger btn-sm" onclick="revenue.del(${r.id})">✕</button></td>
-        </tr>`).join('')}
-      </tbody></table>` : `<p style="color:var(--text-muted);text-align:center;padding:20px 0">${t('no_revenue')}</p>`}
+      <div class="rise">
+        ${App.sectionHead('all_revenue')}
+        <div class="card flush">
+          ${rows.length ? rows.map(r => `<div class="row">
+            ${App.iconChip('calendar', 'neutral')}
+            <div class="r-main">
+              <div class="r-title">${t('week_of')} ${App.fmtDateShort(r.weekStart)}</div>
+              <div class="r-sub">${t('cash')} ${App.fmtMoney0(r.cash || 0)} · ${t('card')} ${App.fmtMoney0(r.credit || 0)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="money" style="font-size:15px">${App.fmtMoney(r.amount)}</span>
+              <button class="icon-btn" onclick="revenue.del(${r.id})">${icon('trash', { size: 16 })}</button>
+            </div>
+          </div>`).join('') : App.emptyState('revenue', 'no_revenue')}
+        </div>
+      </div>
     </div>`;
   },
 
-  calcTotal() {
-    const cash   = +document.getElementById('rev-cash').value   || 0;
-    const credit = +document.getElementById('rev-credit').value || 0;
-    document.getElementById('rev-total-display').textContent = App.fmtMoney(cash + credit);
+  formHTML() {
+    return `<div style="padding-bottom:8px">
+      <div class="field"><label class="lbl">${t('week_starting')}</label>
+        <input class="in" type="date" id="rev-week" value="${App.mondayISO()}"></div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">${t('cash')}</label>${App.moneyField('rev-cash')}</div>
+        <div class="field"><label class="lbl">${t('card')}</label>${App.moneyField('rev-credit')}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:var(--sunken);border-radius:13px;padding:13px 15px;margin-bottom:16px">
+        <span style="font-weight:600;color:var(--muted)">${t('total')}</span>
+        <span class="money c-pos" id="rev-total" style="font-size:22px">$0.00</span>
+      </div>
+      <div class="field"><label class="lbl">${t('notes')}</label><input class="in" id="rev-notes" placeholder="…"></div>
+      <button class="btn btn-brand btn-full" onclick="revenue.add()">${icon('check', { size: 18 })}${t('save_revenue')}</button>
+    </div>`;
   },
-
-  async add(e) {
-    e.preventDefault();
-    const cash   = +document.getElementById('rev-cash').value   || 0;
-    const credit = +document.getElementById('rev-credit').value || 0;
-    if (cash === 0 && credit === 0) {
-      alert('Please enter a cash or credit amount.');
-      return;
-    }
-    await DB.add('revenue', {
-      weekStart: document.getElementById('rev-week').value,
-      cash,
-      credit,
-      amount:    cash + credit,
-      notes:     document.getElementById('rev-notes').value,
-      createdAt: new Date().toISOString()
-    });
-    App.nav('revenue');
+  formMount() {
+    const upd = () => { document.getElementById('rev-total').textContent = App.fmtMoney(App.readMoney('rev-cash') + App.readMoney('rev-credit')); };
+    ['rev-cash', 'rev-credit'].forEach(id => document.getElementById(id).addEventListener('input', upd));
   },
-
-  async del(id) {
-    if (!confirm(t('delete') + '?')) return;
-    await DB.delete('revenue', id);
-    App.nav('revenue');
-  }
+  async add() {
+    const cash = App.readMoney('rev-cash'), credit = App.readMoney('rev-credit');
+    if (cash === 0 && credit === 0) return;
+    await DB.add('revenue', { weekStart: document.getElementById('rev-week').value, cash, credit, amount: cash + credit, notes: document.getElementById('rev-notes').value, createdAt: new Date().toISOString() });
+    App.closeSheet(); App.refresh(); App.toast(t('save_revenue'));
+  },
+  async del(id) { await DB.delete('revenue', id); App.refresh(); },
 };
+
+function substat(labelKey, ic, value, colorCls) {
+  return `<div style="flex:1;background:var(--surface-2);border:1px solid var(--hairline);border-radius:13px;padding:11px 13px">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">${icon(ic, { size: 15, cls: colorCls })}
+      <span style="font-size:12px;font-weight:600;color:var(--muted)">${t(labelKey)}</span></div>
+    <span class="money c-text" style="font-size:16.5px">${App.fmtMoney(value)}</span></div>`;
+}

@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "echo 'Static app - no build step needed'",
+    "serve": "node scripts/static-server.js",
     "ios": "npx cap run ios",
     "android": "npx cap run android",
     "sync": "npx cap sync"

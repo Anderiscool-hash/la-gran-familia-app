@@ -1,161 +1,113 @@
 const merchandise = {
   async render() {
     const [purchases, vendors] = await Promise.all([DB.getAll('merchandise'), DB.getAll('vendors')]);
-    purchases.sort((a,b) => new Date(b.date) - new Date(a.date));
-    const total = purchases.reduce((s,p) => s + (+p.amount), 0);
-    const today = new Date().toISOString().slice(0,10);
+    const total = purchases.reduce((s, m) => s + (+m.amount), 0);
+    const groups = {};
+    [...purchases].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(m => {
+      (groups[m.vendorName] = groups[m.vendorName] || []).push(m);
+    });
 
-    const grouped = {};
-    for (const p of purchases) {
-      const vName = p.vendorName || 'Unknown';
-      if (!grouped[vName]) grouped[vName] = [];
-      grouped[vName].push(p);
-    }
+    const groupCards = Object.entries(groups).map(([vendor, items]) => {
+      const vt = items.reduce((s, m) => s + (+m.amount), 0);
+      return `<div class="rise"><div class="card flush" style="padding:6px 16px 8px">
+        <div class="row">
+          ${App.iconChip('store', 'neutral')}
+          <div class="r-main"><div class="r-title" style="font-weight:680">${App.esc(vendor)}</div></div>
+          <span class="money c-info" style="font-size:15.5px">${App.fmtMoney(vt)}</span>
+        </div>
+        ${items.map(m => `<div class="row">
+          ${m.receiptDataUrl || m.receipt ? `<div class="receipt-thumb">${icon('receipt', { size: 18 })}</div>` : '<span style="font-size:13px;color:var(--faint);width:40px;text-align:center">—</span>'}
+          <div class="r-main"><div class="r-title">${App.fmtMoney(m.amount)}</div><div class="r-sub">${App.fmtDateShort(m.date)}${m.notes ? ' · ' + App.esc(m.notes) : ''}</div></div>
+          <button class="icon-btn" onclick="merchandise.del(${m.id})">${icon('trash', { size: 16 })}</button>
+        </div>`).join('')}
+      </div></div>`;
+    }).join('');
 
-    return `
-    <div class="card">
-      <h2>🛍️ ${t('merchandise')}</h2>
-      <div class="stat-card revenue" style="margin-bottom:16px">
-        <h3>${t('total_spent')}</h3><div class="value">${App.fmtMoney(total)}</div>
+    return `<div class="page">
+      <div class="card rise" style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><div class="metric-label">${t('total_spent')}</div>
+          <span class="money c-text" style="font-size:32px;display:block;margin-top:6px">${App.fmtMoney(total)}</span></div>
+        <div class="iconchip t-info" style="width:42px;height:42px">${icon('merchandise', { size: 22 })}</div>
       </div>
 
-      <form onsubmit="merchandise.add(event)" style="background:var(--surface-alt);border-radius:8px;padding:14px;margin-bottom:20px;border:1px solid var(--border)">
-        <h3 style="font-size:15px;margin-bottom:12px">${t('add_purchase')}</h3>
-        <div class="form-group">
-          <label>${t('store_vendor')}</label>
-          ${vendors.length ? `<select id="merch-vendor" required>
-            <option value="">${t('select_store')}</option>
-            ${vendors.map(v=>`<option value="${v.id}" data-name="${v.name}">${v.name}</option>`).join('')}
-          </select>` : `<p style="color:#e74c3c;font-size:14px">${t('add_store_first')}</p>`}
-        </div>
-        <div class="form-group">
-          <label>${t('date')}</label>
-          <input type="date" id="merch-date" value="${today}" required>
-        </div>
-        <div class="form-group">
-          <label>${t('amount')} ($)</label>
-          <input type="number" id="merch-amount" step="0.01" min="0.01" placeholder="0.00" required>
-        </div>
-        <div class="form-group">
-          <label>${t('receipt_photo')}</label>
-          <input type="file" id="merch-receipt" accept="image/*" capture="environment" required onchange="merchandise.previewReceipt(this)">
-          <img id="receiptPreview" src="" alt="Receipt preview">
-        </div>
-        <div class="form-group">
-          <label>${t('notes')}</label>
-          <input type="text" id="merch-notes" placeholder="…">
-        </div>
-        ${vendors.length ? `<button type="submit" class="btn btn-success">${t('save')}</button>` : ''}
-      </form>
-    </div>
+      <button class="btn btn-brand btn-full" onclick="App.openForm('merch')">${icon('plus', { size: 18 })}${t('add_purchase')}</button>
 
-    ${Object.keys(grouped).length ? Object.entries(grouped).map(([vName, items]) => {
-      const vTotal = items.reduce((s,p) => s + (+p.amount), 0);
-      return `<div class="card">
-        <h2 style="display:flex;justify-content:space-between;align-items:center">
-          <span>🏪 ${vName}</span>
-          <span style="font-size:15px;color:#27ae60;font-weight:700">${App.fmtMoney(vTotal)}</span>
-        </h2>
-        <table><thead><tr><th>${t('date')}</th><th>${t('amount')}</th><th>${t('receipt_photo')}</th><th>${t('notes')}</th><th></th></tr></thead><tbody>
-          ${items.map(p=>`<tr>
-            <td>${App.fmtDate(p.date)}</td>
-            <td style="color:#e67e22;font-weight:600">${App.fmtMoney(p.amount)}</td>
-            <td>${p.receiptDataUrl ? `<img src="${p.receiptDataUrl}" style="height:40px;border-radius:4px;cursor:pointer" onclick="merchandise.viewReceipt('${p.id}')">` : '—'}</td>
-            <td style="color:var(--text-muted)">${p.notes||'—'}</td>
-            <td><button class="btn btn-danger btn-sm" onclick="merchandise.del(${p.id})">✕</button></td>
-          </tr>`).join('')}
-        </tbody></table>
-      </div>`;
-    }).join('') : ''}
+      ${purchases.length ? groupCards : `<div class="card">${App.emptyState('merchandise', 'no_purchases')}</div>`}
 
-    <div class="card">
-      <h2>🏪 ${t('manage_stores')}</h2>
-      <form onsubmit="merchandise.addVendor(event)" style="display:flex;gap:10px;margin-bottom:16px">
-        <input type="text" id="vendor-name" placeholder="${t('store_name')}" style="flex:1" required>
-        <button type="submit" class="btn btn-primary">${t('add')}</button>
-      </form>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${vendors.map(v=>`<span style="background:var(--surface-alt);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:14px;display:flex;align-items:center;gap:8px">
-          ${v.name}
-          <button onclick="merchandise.delVendor(${v.id})" style="background:none;border:none;cursor:pointer;color:#e74c3c;font-size:16px;padding:0;line-height:1">×</button>
-        </span>`).join('') || `<p style="color:var(--text-muted)">${t('no_stores')}</p>`}
+      <div class="rise">
+        ${App.sectionHead('manage_stores')}
+        <div class="card">
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${vendors.length ? vendors.map(v => `<span class="pill">${App.esc(v.name)}
+              <span class="tap" onclick="merchandise.delVendor(${v.id})" style="color:var(--faint);display:flex">${icon('close', { size: 15, stroke: 2.2 })}</span></span>`).join('')
+              : `<span style="font-size:13.5px;color:var(--faint)">${t('no_stores')}</span>`}
+          </div>
+          <div style="display:flex;gap:10px;margin-top:14px">
+            <input class="in" id="vendor-name" placeholder="${t('store_name')}" style="flex:1">
+            <button class="btn btn-soft" onclick="merchandise.addVendor()">${icon('plus', { size: 16 })}${t('add')}</button>
+          </div>
+        </div>
       </div>
-    </div>
-
-    <div id="receipt-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center" onclick="merchandise.closeReceipt()">
-      <img id="receipt-modal-img" src="" style="max-width:90vw;max-height:90vh;border-radius:8px">
     </div>`;
   },
 
-  previewReceipt(input) {
-    const file = input.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = document.getElementById('receiptPreview');
-      img.src = e.target.result;
-      img.style.display = 'block';
-    };
-    reader.readAsDataURL(file);
+  formHTML() {
+    // Merch form needs vendors loaded first — see openAddForm() / App.openForm('merch').
+    return this._formBody();
   },
 
-  async add(e) {
-    e.preventDefault();
-    const vendorSel = document.getElementById('merch-vendor');
-    const vendorOpt = vendorSel.options[vendorSel.selectedIndex];
-    const file = document.getElementById('merch-receipt').files[0];
-    let receiptDataUrl = null;
-    if (file) {
-      receiptDataUrl = await new Promise(res => {
-        const r = new FileReader();
-        r.onload = ev => res(ev.target.result);
-        r.readAsDataURL(file);
-      });
-    }
+  // Build the form synchronously from a cached vendor list
+  _vendors: [],
+  async openAddForm() {
+    this._vendors = await DB.getAll('vendors');
+    App.openSheet({ title: t('add_purchase'), body: this._formBody(), onMount: () => {} });
+  },
+  _formBody() {
+    const opts = this._vendors.map(v => `<option value="${v.id}">${App.esc(v.name)}</option>`).join('');
+    return `<div style="padding-bottom:8px">
+      <div class="field"><label class="lbl">${t('store_vendor')}</label>
+        <select class="in" id="merch-vendor">${opts || `<option value="">${t('select_store')}</option>`}</select></div>
+      <div class="grid-2">
+        <div class="field"><label class="lbl">${t('date')}</label><input class="in" type="date" id="merch-date" value="${App.mondayISO()}"></div>
+        <div class="field"><label class="lbl">${t('amount')}</label>${App.moneyField('merch-amount')}</div>
+      </div>
+      <div class="field"><label class="lbl">${t('notes')}</label><input class="in" id="merch-notes" placeholder="…"></div>
+      <div class="field"><label class="lbl">${t('receipt_photo')}</label>
+        <button type="button" id="merch-receipt" data-on="1" onclick="merchandise.toggleReceipt()"
+          style="width:100%;border:1.5px dashed var(--border);border-radius:13px;padding:16px;background:var(--brand-soft);color:var(--brand-ink);display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;font-weight:600;font-size:14px">
+          ${icon('check', { size: 19 })}<span>${t('receipt')} ✓</span></button></div>
+      <button class="btn btn-brand btn-full" onclick="merchandise.add()">${icon('check', { size: 18 })}${t('save')}</button>
+    </div>`;
+  },
+  toggleReceipt() {
+    const b = document.getElementById('merch-receipt');
+    const on = b.dataset.on === '1' ? '0' : '1';
+    b.dataset.on = on;
+    b.style.background = on === '1' ? 'var(--brand-soft)' : 'var(--surface-2)';
+    b.style.color = on === '1' ? 'var(--brand-ink)' : 'var(--muted)';
+    b.innerHTML = on === '1' ? `${icon('check', { size: 19 })}<span>${t('receipt')} ✓</span>` : `${icon('camera', { size: 19 })}<span>${t('receipt_photo')}</span>`;
+  },
+  async add() {
+    const vid = +document.getElementById('merch-vendor').value;
+    const amount = App.readMoney('merch-amount');
+    if (!vid || !amount) return;
+    const v = this._vendors.find(x => x.id === vid);
     await DB.add('merchandise', {
-      vendorId:      +vendorSel.value,
-      vendorName:    vendorOpt.dataset.name,
-      date:          document.getElementById('merch-date').value,
-      amount:        +document.getElementById('merch-amount').value,
-      notes:         document.getElementById('merch-notes').value,
-      receiptDataUrl,
-      createdAt:     new Date().toISOString()
+      vendorId: vid, vendorName: v ? v.name : '',
+      date: document.getElementById('merch-date').value, amount,
+      notes: document.getElementById('merch-notes').value,
+      receipt: document.getElementById('merch-receipt').dataset.on === '1',
+      receiptDataUrl: null, createdAt: new Date().toISOString(),
     });
-    App.nav('merchandise');
+    App.closeSheet(); App.refresh(); App.toast(t('save'));
   },
-
-  async del(id) {
-    if (!confirm(t('delete') + '?')) return;
-    await DB.delete('merchandise', id);
-    App.nav('merchandise');
-  },
-
-  async addVendor(e) {
-    e.preventDefault();
-    const name = document.getElementById('vendor-name').value.trim();
-    const vendors = await DB.getAll('vendors');
-    if (vendors.some(v => v.name.toLowerCase() === name.toLowerCase())) { alert(t('store_name') + ' exists.'); return; }
+  async del(id) { await DB.delete('merchandise', id); App.refresh(); },
+  async addVendor() {
+    const el = document.getElementById('vendor-name');
+    const name = el.value.trim();
+    if (!name) return;
     await DB.add('vendors', { name, createdAt: new Date().toISOString() });
-    App.nav('merchandise');
+    App.refresh();
   },
-
-  async delVendor(id) {
-    if (!confirm(t('delete') + '?')) return;
-    await DB.delete('vendors', id);
-    App.nav('merchandise');
-  },
-
-  async viewReceipt(id) {
-    const modal = document.getElementById('receipt-modal');
-    const all = await DB.getAll('merchandise');
-    const item = all.find(p => String(p.id) === String(id));
-    if (item?.receiptDataUrl) {
-      document.getElementById('receipt-modal-img').src = item.receiptDataUrl;
-      modal.style.display = 'flex';
-    }
-  },
-
-  closeReceipt() {
-    document.getElementById('receipt-modal').style.display = 'none';
-  }
+  async delVendor(id) { await DB.delete('vendors', id); App.refresh(); },
 };

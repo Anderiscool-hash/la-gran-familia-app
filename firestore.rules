@@ -1,0 +1,68 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn() && profile().role == 'admin';
+    }
+
+    function isWorker() {
+      return signedIn() && profile().role == 'worker';
+    }
+
+    function isOwnerBootstrap(userId) {
+      return signedIn()
+        && request.auth.uid == userId
+        && request.auth.token.email == 'owner@lagranfamilia.app'
+        && request.resource.data.username == 'owner'
+        && request.resource.data.role == 'admin';
+    }
+
+    match /orders/{orderId} {
+      allow read, write: if isAdmin() || isWorker();
+    }
+
+    match /users/{userId} {
+      allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isAdmin() || isOwnerBootstrap(userId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /revenue/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /expenses/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /merchandise/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /vendors/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /employees/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /deductions/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

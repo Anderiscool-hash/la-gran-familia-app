@@ -1,90 +1,101 @@
 const settings = {
   async render() {
     const theme = localStorage.getItem('theme') || 'light';
-    const lang  = localStorage.getItem('lang')  || 'en';
+    const lang = localStorage.getItem('lang') || 'en';
+    const accent = localStorage.getItem('accent') || 'Pine';
+    const me = Auth.user() || { name: 'Owner', username: 'admin', role: 'admin' };
 
-    return `
-    <div class="card">
-      <h2>⚙️ ${t('settings')}</h2>
-    </div>
+    const tile = (active, ic, label, onclick) => `<button class="choice-tile ${active ? 'active' : ''}" onclick="${onclick}">${icon(ic, { size: 24 })}<span>${label}</span></button>`;
+    const accentSwatch = name => {
+      const hue = App.ACCENTS[name];
+      const on = accent === name;
+      return `<button onclick="App.setAccent('${name}')" class="tap" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border:1.5px solid ${on ? 'var(--brand)' : 'var(--border)'};background:${on ? 'var(--brand-soft)' : 'var(--surface)'};border-radius:14px;padding:12px 6px;cursor:pointer">
+        <span style="width:26px;height:26px;border-radius:999px;background:oklch(0.55 0.12 ${hue})"></span>
+        <span style="font-size:12px;font-weight:600;color:${on ? 'var(--brand-ink)' : 'var(--muted)'}">${name}</span></button>`;
+    };
 
-    <div class="card">
-      <h2>🎨 ${t('appearance')}</h2>
-      <div class="setting-tiles">
-        <div class="setting-tile ${theme==='light'?'active':''}" onclick="settings.setTheme('light')">
-          <div class="tile-icon">☀️</div>
-          <div class="tile-label">${t('light')}</div>
-        </div>
-        <div class="setting-tile ${theme==='dark'?'active':''}" onclick="settings.setTheme('dark')">
-          <div class="tile-icon">🌙</div>
-          <div class="tile-label">${t('dark')}</div>
-        </div>
-      </div>
-    </div>
+    return `<div class="page">
+      <div class="rise">${App.sectionHead('appearance')}
+        <div class="choice-tiles">
+          ${tile(theme === 'light', 'sun', t('light'), "App.setTheme('light')")}
+          ${tile(theme === 'dark', 'moon', t('dark'), "App.setTheme('dark')")}
+        </div></div>
 
-    <div class="card">
-      <h2>🌐 ${t('language')}</h2>
-      <div class="setting-tiles">
-        <div class="setting-tile ${lang==='en'?'active':''}" onclick="settings.setLang('en')">
-          <div class="tile-icon">🇺🇸</div>
-          <div class="tile-label">English</div>
-        </div>
-        <div class="setting-tile ${lang==='es'?'active':''}" onclick="settings.setLang('es')">
-          <div class="tile-icon">🇲🇽</div>
-          <div class="tile-label">Español</div>
-        </div>
-      </div>
-    </div>
+      <div class="rise">${App.sectionHead('accent')}
+        <div style="display:flex;gap:10px">${Object.keys(App.ACCENTS).map(accentSwatch).join('')}</div></div>
 
-    <div class="card">
-      <h2>📲 ${t('install_app')}</h2>
-      <div id="install-android" style="display:none">
-        <button class="btn btn-success" onclick="settings.installAndroid()" style="width:100%;margin-bottom:10px">
-          📲 ${t('install_app')}
-        </button>
-      </div>
-      <div id="install-ios" style="display:none;background:var(--surface-alt);border-radius:10px;padding:16px;border:1px solid var(--border)">
-        <ol style="margin:0 0 0 20px;line-height:2;font-size:14px;color:var(--text-muted)">
-          <li>Tap <strong>Share ⬆️</strong></li>
-          <li>Tap <strong>"Add to Home Screen"</strong></li>
-          <li>Tap <strong>"Add"</strong></li>
-        </ol>
-      </div>
-      <div id="install-done" style="display:none;color:#27ae60;font-weight:600;font-size:14px">
-        ✅ ${t('install_app')}!
-      </div>
-    </div>
+      <div class="rise">${App.sectionHead('language')}
+        <div class="choice-tiles">
+          ${tile(lang === 'en', 'globe', 'English', "App.setLang('en')")}
+          ${tile(lang === 'es', 'globe', 'Español', "App.setLang('es')")}
+        </div></div>
 
-    `;
+      <div class="rise">${App.sectionHead('account')}
+        <div class="card flush">
+          <div class="row">
+            ${App.avatar(me.name || 'Owner', 'brand')}
+            <div class="r-main"><div class="r-title">${App.esc(me.name || 'Owner')}</div>
+              <div class="r-sub">${t('signed_in_as')} <span class="num">@${App.esc(me.username)}</span></div></div>
+            ${App.badge(me.role === 'admin' ? t('admin') : t('worker'), me.role === 'admin' ? 'brand' : 'info', me.role === 'admin' ? 'shield' : 'users')}
+          </div>
+          <div class="row tap" onclick="App.toast(t('install_app'))">
+            ${App.iconChip('download', 'neutral')}
+            <div class="r-main"><div class="r-title">${t('install_app')}</div><div class="r-sub">iOS · Android</div></div>
+            ${icon('chevronRight', { size: 17, cls: 'c-faint' })}
+          </div>
+          <div class="row tap" onclick="settings.openPasswordForm()">
+            ${App.iconChip('key', 'brand')}
+            <div class="r-main"><div class="r-title">${t('change_password')}</div></div>
+            ${icon('chevronRight', { size: 17, cls: 'c-faint' })}
+          </div>
+        </div></div>
+
+      <div class="rise">${App.sectionHead('data')}
+        <div class="card flush">
+          <div class="row tap" onclick="settings.loadSample()">
+            ${App.iconChip('sparkle', 'info')}
+            <div class="r-main"><div class="r-title">${t('load_sample')}</div></div>
+            ${icon('chevronRight', { size: 17, cls: 'c-faint' })}
+          </div>
+          <div class="row tap" onclick="settings.reset()">
+            ${App.iconChip('refresh', 'neg')}
+            <div class="r-main"><div class="r-title" style="color:var(--neg)">${t('reset_data')}</div></div>
+            ${icon('chevronRight', { size: 17, cls: 'c-faint' })}
+          </div>
+        </div></div>
+
+      <button class="btn btn-danger-ghost btn-full" onclick="App.signOut()">${icon('logout', { size: 18 })}${t('sign_out')}</button>
+      <div class="num" style="text-align:center;font-size:12px;color:var(--faint)">La Gran Familia · ${t('version')} 2.0</div>
+    </div>`;
   },
 
-  mount() {
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-                      || window.navigator.standalone;
-    if (isStandalone) {
-      document.getElementById('install-done').style.display = 'block';
-    } else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
-      document.getElementById('install-ios').style.display = 'block';
-    } else if (window._installPrompt) {
-      document.getElementById('install-android').style.display = 'block';
-    } else {
-      document.getElementById('install-ios').style.display = 'block';
-    }
+  async loadSample() {
+    await DB.seedDemo();
+    localStorage.setItem('demoSeeded', '1');
+    App.refresh(); App.toast(t('sample_loaded'));
   },
-
-  setTheme(theme) {
-    localStorage.setItem('theme', theme);
-    document.getElementById('htmlRoot').dataset.theme = theme;
-    App.nav('settings');
+  async reset() {
+    if (!confirm(t('reset_confirm'))) return;
+    await DB.clearAll();
+    await DB.seedAdmin();
+    localStorage.setItem('demoSeeded', '1');
+    App.toast(t('data_reset'));
+    App.nav('dashboard');
   },
-
-  setLang(lang) {
-    localStorage.setItem('lang', lang);
-    applyTranslations();
-    App.nav(App.getCurrentPage());
+  openPasswordForm() {
+    App.openSheet({
+      title: t('change_password'),
+      body: `<div style="padding-bottom:8px">
+        <div class="field"><label class="lbl">${t('new_password')}</label><input class="in" id="own-pass" type="password" autocomplete="new-password" placeholder="••••"></div>
+        <button class="btn btn-brand btn-full" onclick="settings.changeOwnPassword()">${icon('check', { size: 18 })}${t('update_password')}</button>
+      </div>`
+    });
   },
-
-  installAndroid() {
-    if (window._installPrompt) window._installPrompt.prompt();
-  }
+  async changeOwnPassword() {
+    const pass = document.getElementById('own-pass').value;
+    if (!pass || pass.length < 6) return;
+    await Auth.updatePassword(pass);
+    App.closeSheet();
+    App.toast(t('update_password'));
+  },
 };

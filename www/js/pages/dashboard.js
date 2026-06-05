@@ -1,187 +1,160 @@
+/* Shared weekly computation — used by dashboard & reports */
+async function getWeekStats() {
+  const [revenue, expenses, merchandise, employees, deductions] = await Promise.all([
+    DB.getAll('revenue'), DB.getAll('expenses'), DB.getAll('merchandise'),
+    DB.getAll('employees'), DB.getAll('deductions'),
+  ]);
+  const rev = [...revenue].sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
+  const monIso = App.mondayISO();
+  const prevMon = (() => { const d = App.weekBounds().monday; d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
+  const weekRev = rev.find(r => r.weekStart === monIso) || { amount: 0, cash: 0, credit: 0 };
+  const prevRev = rev.find(r => r.weekStart === prevMon) || { amount: 0 };
+  const weekExpenses = expenses.filter(e => !e.isRecurring && App.inThisWeek(e.date)).reduce((s, e) => s + (+e.amount), 0);
+  const weekMerch = merchandise.filter(m => App.inThisWeek(m.date)).reduce((s, m) => s + (+m.amount), 0);
+  const grossPay = employees.reduce((s, e) => s + (+e.weeklyPay || 0), 0);
+  const totalDed = deductions.reduce((s, d) => s + (+d.amount || 0), 0);
+  const netPayroll = grossPay - totalDed;
+  const monthlyOH = expenses.filter(e => e.isRecurring).reduce((s, e) => s + (+e.amount), 0);
+  const moneyIn = +weekRev.amount || 0;
+  const costs = weekExpenses + weekMerch + netPayroll;
+  const netProfit = moneyIn - costs;
+  const revDelta = prevRev.amount ? ((weekRev.amount - prevRev.amount) / prevRev.amount) * 100 : null;
+  const margin = moneyIn ? (netProfit / moneyIn) * 100 : 0;
+  return { revenue, expenses, merchandise, employees, deductions, rev, weekRev, prevRev,
+    weekExpenses, weekMerch, grossPay, totalDed, netPayroll, monthlyOH, moneyIn, costs, netProfit, revDelta, margin };
+}
+
 const dashboard = {
   async render() {
-    const { monday, sunday } = App.weekBounds();
-    const [revenues, expenses, employees, merch, recurringAll] = await Promise.all([
-      DB.getAll('revenue'), DB.getAll('expenses'), DB.getAll('employees'),
-      DB.getAll('merchandise'), DB.getAll('expenses')
-    ]);
+    const c = await getWeekStats();
+    const profitClass = c.netProfit >= 0 ? 'c-pos' : 'c-neg';
 
-    const weekRevenues = revenues.filter(r => { const d = new Date(r.weekStart); return d >= monday && d <= sunday; });
-    const weekExpenses = expenses.filter(e => { const d = new Date(e.date); return d >= monday && d <= sunday; });
-    const weekMerch    = merch.filter(p => { const d = new Date(p.date); return d >= monday && d <= sunday; });
-    const deductions   = await DB.getAll('deductions');
+    const segs = [
+      ['net_profit', Math.max(0, c.netProfit), 'var(--pos)'],
+      ['net_payroll', c.netPayroll, 'var(--brand)'],
+      ['merchandise', c.weekMerch, 'var(--info)'],
+      ['total_expenses', c.weekExpenses, 'var(--neg)'],
+    ].filter(s => s[1] > 0);
 
-    const totalRevenue  = weekRevenues.reduce((s,r) => s + (+r.amount), 0);
-    const totalExpenses = weekExpenses.reduce((s,e) => s + (+e.amount), 0);
-    const totalMerch    = weekMerch.reduce((s,p) => s + (+p.amount), 0);
-    const totalPay      = employees.reduce((s,e) => s + (+e.weeklyPay), 0);
-    const totalDed      = deductions.reduce((s,d) => s + (+d.amount), 0);
-    const netPayroll    = totalPay - totalDed;
-    const netProfit     = totalRevenue - totalExpenses - totalMerch - netPayroll;
-    const monthlyOH     = [...new Map(recurringAll.filter(e=>e.isRecurring).map(e=>[e.description+e.amount,e])).values()]
-                            .reduce((s,e) => s + (+e.amount), 0);
+    const flow = `<div class="flow-bar">
+      <span style="flex:${Math.max(0, c.netProfit)};background:var(--pos)"></span>
+      <span style="flex:${c.netPayroll};background:var(--brand)"></span>
+      <span style="flex:${c.weekMerch};background:var(--info)"></span>
+      <span style="flex:${c.weekExpenses};background:var(--neg)"></span>
+    </div>`;
 
-    const label = `${monday.toLocaleDateString('en-US',{month:'short',day:'numeric'})} — ${sunday.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
-    const recentExp = [...expenses].sort((a,b) => new Date(b.date)-new Date(a.date)).slice(0,5);
+    // trend — last 5 weeks
+    const trend = [...c.rev].sort((a, b) => new Date(a.weekStart) - new Date(b.weekStart)).slice(-5);
+    const maxT = Math.max(...trend.map(r => +r.amount), 1);
+    const bars = trend.map((r, i) => {
+      const last = i === trend.length - 1;
+      const h = Math.max(6, (+r.amount / maxT) * 74);
+      const lbl = new Date(r.weekStart + 'T00:00:00').toLocaleDateString(App.lang() === 'es' ? 'es-MX' : 'en-US', { day: 'numeric' });
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div class="num" style="font-size:10.5px;font-weight:600;color:${last ? 'var(--brand)' : 'var(--faint)'}">${App.fmtK(r.amount)}</div>
+        <div style="width:100%;max-width:30px;height:${h}px;border-radius:7px;background:${last ? 'var(--brand)' : 'var(--border)'}"></div>
+        <div style="font-size:10.5px;color:var(--faint);font-weight:500">${lbl}</div>
+      </div>`;
+    }).join('');
 
-    // Build pie chart segments — only include values > 0
-    const segments = [];
-    if (totalExpenses > 0) segments.push({ label: t('expenses'),        value: totalExpenses, color: '#e74c3c' });
-    if (totalMerch    > 0) segments.push({ label: t('merchandise'),     value: totalMerch,    color: '#1abc9c' });
-    if (netPayroll    > 0) segments.push({ label: t('net_payroll'),     value: netPayroll,    color: '#3498db' });
-    if (monthlyOH     > 0) segments.push({ label: t('monthly_overhead'),value: monthlyOH,     color: '#e67e22' });
-    if (netProfit     > 0) segments.push({ label: t('net_profit'),      value: netProfit,     color: '#27ae60' });
+    // recent activity
+    const recent = [
+      ...c.expenses.filter(e => !e.isRecurring).map(e => ({ icon: 'expenses', tone: 'neg', title: e.description, date: e.date, amount: -e.amount })),
+      ...c.merchandise.map(m => ({ icon: 'merchandise', tone: 'info', title: m.vendorName, date: m.date, amount: -m.amount })),
+      ...(c.weekRev.amount ? [{ icon: 'revenue', tone: 'pos', title: t('revenue'), date: c.weekRev.weekStart, amount: c.weekRev.amount }] : []),
+    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
 
-    const chartData = JSON.stringify({ segments, totalRevenue, netProfit });
+    const metricCells = [
+      ['revenue', c.moneyIn, 'revenue', 'pos'],
+      ['total_expenses', c.weekExpenses, 'expenses', 'neg'],
+      ['merchandise', c.weekMerch, 'merchandise', 'info'],
+      ['net_payroll', c.netPayroll, 'employees', 'brand'],
+    ].map((m, i) => `
+      <div style="padding:15px;${i % 2 === 0 ? 'border-right:1px solid var(--hairline);' : ''}${i < 2 ? 'border-bottom:1px solid var(--hairline);' : ''}">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+          ${App.iconChip(m[2], m[3], { sm: true })}
+          <span class="metric-label">${t(m[0])}</span>
+        </div>
+        <span class="money" style="font-size:20px">${App.fmtMoney(m[1])}</span>
+      </div>`).join('');
 
-    return `
-    <div class="card">
-      <h2>📊 ${t('dashboard')} <small style="font-size:13px;color:var(--text-muted)">${label}</small></h2>
-      <div class="grid">
-        <div class="stat-card revenue"><h3>${t('revenue')}</h3><div class="value">${App.fmtMoney(totalRevenue)}</div></div>
-        <div class="stat-card total-expenses"><h3>${t('expenses')}</h3><div class="value">${App.fmtMoney(totalExpenses)}</div></div>
-        <div class="stat-card total-pay"><h3>${t('net_payroll')}</h3><div class="value">${App.fmtMoney(netPayroll)}</div></div>
-        <div class="stat-card employee-spending"><h3>${t('merchandise')}</h3><div class="value">${App.fmtMoney(totalMerch)}</div></div>
-        <div class="stat-card" style="background:linear-gradient(135deg,#f7971e,#ffd200)"><h3>${t('monthly_overhead')}</h3><div class="value">${App.fmtMoney(monthlyOH)}</div></div>
-        <div class="stat-card ${netProfit>=0?'net-profit':'net-loss'}"><h3>${t('net_profit')}</h3><div class="value">${App.fmtMoney(netProfit)}</div></div>
+    return `<div class="page">
+
+      <div class="card rise" style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="metric-label">${c.netProfit >= 0 ? t('net_profit') : t('net_loss')} · ${t('this_week')}</div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:6px">
+              <span class="money ${profitClass}" style="font-size:38px">${App.fmtMoney(Math.abs(c.netProfit))}</span>
+              ${App.delta(c.revDelta)}
+            </div>
+            <div style="font-size:12.5px;color:var(--faint);margin-top:3px">${Math.round(c.margin)}% ${t('profit_margin').toLowerCase()} · ${t('vs_last')}</div>
+          </div>
+          <div class="iconchip t-pos" style="width:42px;height:42px">${icon('wallet', { size: 22 })}</div>
+        </div>
+        ${flow}
+        <div style="display:flex;justify-content:space-between;gap:12px">
+          <div><div class="metric-label">${t('money_in')}</div><span class="money c-text" style="font-size:16px">${App.fmtMoney(c.moneyIn)}</span></div>
+          <div style="text-align:right"><div class="metric-label">${t('money_out')}</div><span class="money c-text" style="font-size:16px">${App.fmtMoney(c.costs)}</span></div>
+        </div>
       </div>
-    </div>
 
-    <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
-      <div class="card" style="text-align:center">
-        <div style="font-size:28px;margin-bottom:6px">💵</div>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">${t('add_revenue')}</p>
-        <button class="btn btn-success" style="width:100%" onclick="App.nav('revenue')">+ ${t('revenue')}</button>
+      <div class="card rise" style="padding:0">
+        <div class="grid-2">${metricCells}</div>
       </div>
-      <div class="card" style="text-align:center">
-        <div style="font-size:28px;margin-bottom:6px">🧾</div>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">${t('add_expense')}</p>
-        <button class="btn btn-success" style="width:100%" onclick="App.nav('expenses')">+ ${t('expenses')}</button>
+
+      <div class="rise">
+        ${App.sectionHead('where_money_goes')}
+        <div class="card" style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:18px">
+          ${donutSVG(segs, c.netProfit, t('net_profit'), c.netProfit >= 0 ? 'var(--pos)' : 'var(--neg)')}
+          <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:9px 16px">
+            ${segs.map(s => `<div style="display:flex;align-items:center;gap:8px">
+              <span class="legend-dot" style="background:${s[2]}"></span>
+              <span style="font-size:12.5px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t(s[0])}</span>
+              <span class="money c-text" style="font-size:12.5px">${App.fmtMoney0(s[1])}</span>
+            </div>`).join('')}
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- Pie chart card -->
-    <div class="card">
-      <h2>🥧 ${t('breakdown')}</h2>
-      <script id="pie-data" type="application/json">${chartData}<\/script>
-      <canvas id="pieChart" style="display:block;margin:0 auto;width:100%;max-width:300px;height:300px"></canvas>
-      <div id="pie-legend" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;justify-content:center"></div>
-    </div>
+      ${trend.length ? `<div class="rise">
+        ${App.sectionHead('revenue')}
+        <div class="card" style="padding:18px">
+          <div style="display:flex;align-items:flex-end;gap:10px;height:96px">${bars}</div>
+        </div>
+      </div>` : ''}
 
-    <div class="card">
-      <h2>📈 ${t('expenses')} — ${t('reports')}</h2>
-      ${recentExp.length ? `<table><thead><tr><th>${t('date')}</th><th>${t('description')}</th><th>${t('amount')}</th></tr></thead><tbody>
-        ${recentExp.map(e=>`<tr><td>${App.fmtDate(e.date)}</td><td>${e.description}</td><td>${App.fmtMoney(e.amount)}</td></tr>`).join('')}
-      </tbody></table>` : `<p style="color:var(--text-muted);padding:20px 0;text-align:center">${t('no_expenses')}</p>`}
+      <div class="rise">
+        ${App.sectionHead('recent_activity')}
+        <div class="card flush">
+          ${recent.length ? recent.map(r => `<div class="row">
+            ${App.iconChip(r.icon, r.tone)}
+            <div class="r-main"><div class="r-title">${App.esc(r.title)}</div><div class="r-sub">${App.fmtDateShort(r.date)}</div></div>
+            <span class="money ${r.amount >= 0 ? 'c-pos' : 'c-text'}" style="font-size:14.5px">${App.fmtMoney(Math.abs(r.amount))}</span>
+          </div>`).join('') : App.emptyState('sparkle', 'no_revenue')}
+        </div>
+      </div>
+
     </div>`;
   },
-
-  mount() {
-    const canvas = document.getElementById('pieChart');
-    const dataEl = document.getElementById('pie-data');
-    if (!canvas || !dataEl) return;
-
-    const { segments, totalRevenue, netProfit } = JSON.parse(dataEl.textContent);
-    const legendEl = document.getElementById('pie-legend');
-
-    // Build legend
-    if (segments.length) {
-      legendEl.innerHTML = segments.map(s => `
-        <div style="display:flex;align-items:center;gap:6px;font-size:13px">
-          <span style="width:12px;height:12px;border-radius:3px;background:${s.color};flex-shrink:0"></span>
-          <span style="color:var(--text-muted)">${s.label}</span>
-          <span style="font-weight:600;color:var(--text)">${App.fmtMoney(s.value)}</span>
-        </div>`).join('');
-    }
-
-    if (!segments.length) {
-      // No data yet — draw empty ring
-      const ctx = canvas.getContext('2d');
-      const size = 280;
-      canvas.width = size; canvas.height = size;
-      ctx.beginPath();
-      ctx.arc(size/2, size/2, size/2 - 20, 0, Math.PI*2);
-      ctx.strokeStyle = 'var(--border)';
-      ctx.lineWidth = 40;
-      ctx.stroke();
-      legendEl.innerHTML = `<p style="color:var(--text-muted);font-size:14px">Add revenue &amp; expenses to see breakdown</p>`;
-      return;
-    }
-
-    const dpr   = window.devicePixelRatio || 1;
-    const size  = Math.min(canvas.parentElement.offsetWidth - 40, 300);
-    canvas.width  = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width  = size + 'px';
-    canvas.style.height = size + 'px';
-
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-
-    const cx = size / 2, cy = size / 2;
-    const outerR = size / 2 - 12;
-    const innerR = outerR * 0.54;
-    const total  = segments.reduce((s, seg) => s + seg.value, 0);
-    const rootEl = document.getElementById('htmlRoot');
-
-    const duration  = 1100;
-    const startTime = performance.now();
-
-    const animate = (now) => {
-      const p      = Math.min((now - startTime) / duration, 1);
-      const eased  = p < 0.5 ? 2*p*p : -1+(4-2*p)*p;
-
-      ctx.clearRect(0, 0, size, size);
-
-      // Draw background ring (grey)
-      ctx.beginPath();
-      ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-      ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
-      ctx.fillStyle = getComputedStyle(rootEl).getPropertyValue('--border').trim() || '#e0e0e0';
-      ctx.fill('evenodd');
-
-      // Draw segments
-      let startAngle = -Math.PI / 2;
-      for (const seg of segments) {
-        const sliceAngle = (seg.value / total) * Math.PI * 2 * eased;
-        ctx.beginPath();
-        ctx.arc(cx, cy, outerR, startAngle, startAngle + sliceAngle);
-        ctx.arc(cx, cy, innerR, startAngle + sliceAngle, startAngle, true);
-        ctx.closePath();
-        ctx.fillStyle = seg.color;
-        ctx.fill();
-        ctx.strokeStyle = getComputedStyle(rootEl).getPropertyValue('--surface').trim() || '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        startAngle += sliceAngle;
-      }
-
-      // Center text
-      const surfaceColor = getComputedStyle(rootEl).getPropertyValue('--surface').trim() || '#fff';
-      ctx.beginPath();
-      ctx.arc(cx, cy, innerR - 2, 0, Math.PI * 2);
-      ctx.fillStyle = surfaceColor;
-      ctx.fill();
-
-      const headingColor  = getComputedStyle(rootEl).getPropertyValue('--heading').trim()   || '#2c3e50';
-      const mutedColor    = getComputedStyle(rootEl).getPropertyValue('--text-muted').trim() || '#666';
-
-      const profitLabel = netProfit >= 0 ? t('net_profit') : t('net_loss');
-      const profitColor = netProfit >= 0 ? '#27ae60' : '#e74c3c';
-
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font         = `bold ${Math.round(size * 0.1)}px -apple-system, BlinkMacSystemFont, sans-serif`;
-      ctx.fillStyle    = headingColor;
-      ctx.fillText(App.fmtMoney(Math.abs(netProfit)), cx, cy - size * 0.06);
-
-      ctx.font      = `${Math.round(size * 0.068)}px -apple-system, BlinkMacSystemFont, sans-serif`;
-      ctx.fillStyle = profitColor;
-      ctx.fillText(profitLabel, cx, cy + size * 0.06);
-
-      if (p < 1) requestAnimationFrame(animate);
-    };
-
-    requestAnimationFrame(animate);
-  }
 };
+
+/* Donut chart as inline SVG */
+function donutSVG(segments, centerVal, centerLabel, centerColor) {
+  const size = 188, stroke = 22, r = (size - stroke) / 2, circ = 2 * Math.PI * r;
+  const total = segments.reduce((s, x) => s + x[1], 0) || 1;
+  let off = 0;
+  const arcs = segments.map(seg => {
+    const dash = (seg[1] / total) * circ;
+    const el = `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${seg[2]}" stroke-width="${stroke}"
+      stroke-dasharray="${dash} ${circ - dash}" stroke-dashoffset="${-off}" transform="rotate(-90 ${size / 2} ${size / 2})"></circle>`;
+    off += dash;
+    return el;
+  }).join('');
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--sunken)" stroke-width="${stroke}"></circle>
+    ${arcs}
+    <text x="50%" y="46%" text-anchor="middle" dominant-baseline="middle" style="font-family:var(--font-num);font-size:27px;font-weight:680;letter-spacing:-0.03em;fill:${centerColor}">${App.fmtMoney0(Math.abs(centerVal))}</text>
+    <text x="50%" y="60%" text-anchor="middle" dominant-baseline="middle" style="font-family:var(--font-ui);font-size:12.5px;font-weight:600;fill:var(--muted)">${centerLabel}</text>
+  </svg>`;
+}

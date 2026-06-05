@@ -7,3 +7,5 @@ android/app/build/
 android/build/
 *.DS_Store
 .env
+firebase-debug.log
+_backup_www_*/

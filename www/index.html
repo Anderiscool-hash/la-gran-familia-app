@@ -1,59 +1,49 @@
 <!DOCTYPE html>
-<html lang="en" id="htmlRoot">
+<html lang="en" id="htmlRoot" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#2c3e50">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="LGF Grocery">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2f5d50">
+<title>La Gran Familia — Grocery Corp.</title>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<title>La Gran Familia Grocery Corp.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+  <div id="app">
+    <header class="app-header" id="appHeader"></header>
+    <div class="offline-banner" id="offlineBanner">You're offline — changes are saved on this device.</div>
+    <main id="pageContainer"></main>
+    <nav class="bottom-nav" id="bottomNav"></nav>
 
-<div id="app">
+    <!-- Bottom sheet -->
+    <div class="sheet-scrim" id="sheetScrim" onclick="App.closeSheet()"></div>
+    <div class="sheet" id="sheet"></div>
 
-  <header>
-    <div class="header-inner">
-      <div class="logo" onclick="App.nav('dashboard')">
-        <span class="logo-icon">💰</span>
-        <span class="logo-text">La Gran Familia<span class="logo-sub">Grocery Corp.</span></span>
-      </div>
-      <button class="hamburger" onclick="App.toggleNav()">☰</button>
-    </div>
-  </header>
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+  </div>
 
-  <div id="navOverlay" class="nav-overlay" onclick="App.closeNav()"></div>
-  <nav id="navDrawer" class="nav-drawer">
-    <div class="nav-drawer-header">
-      <div class="logo-text">La Gran Familia<span class="logo-sub">Grocery Corp.</span></div>
-    </div>
-    <a class="nav-link active" data-page="dashboard"   onclick="App.nav('dashboard')"><span class="nav-icon">🏠</span><span data-t="dashboard">Dashboard</span></a>
-    <a class="nav-link" data-page="revenue"            onclick="App.nav('revenue')"><span class="nav-icon">💵</span><span data-t="revenue">Revenue</span></a>
-    <a class="nav-link" data-page="expenses"           onclick="App.nav('expenses')"><span class="nav-icon">🧾</span><span data-t="expenses">Expenses</span></a>
-    <a class="nav-link" data-page="merchandise"        onclick="App.nav('merchandise')"><span class="nav-icon">🛍️</span><span data-t="merchandise">Merchandise</span></a>
-    <a class="nav-link" data-page="employees"          onclick="App.nav('employees')"><span class="nav-icon">👥</span><span data-t="employees">Employees</span></a>
-    <a class="nav-link" data-page="reports"            onclick="App.nav('reports')"><span class="nav-icon">📊</span><span data-t="reports">Reports</span></a>
-    <a class="nav-link" data-page="settings"           onclick="App.nav('settings')"><span class="nav-icon">⚙️</span><span data-t="settings">Settings</span></a>
-  </nav>
-
-  <div id="pageContainer"></div>
-  <div id="offlineBanner">You're offline — showing saved data</div>
-
-</div>
-
-<script src="js/db.js"></script>
-<script src="js/translations.js"></script>
-<script src="js/pages/dashboard.js"></script>
-<script src="js/pages/revenue.js"></script>
-<script src="js/pages/expenses.js"></script>
-<script src="js/pages/merchandise.js"></script>
-<script src="js/pages/employees.js"></script>
-<script src="js/pages/reports.js"></script>
-<script src="js/pages/settings.js"></script>
-<script src="js/app.js"></script>
+  <script src="js/translations.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/csv.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/pages/dashboard.js"></script>
+  <script src="js/pages/revenue.js"></script>
+  <script src="js/pages/expenses.js"></script>
+  <script src="js/pages/merchandise.js"></script>
+  <script src="js/pages/employees.js"></script>
+  <script src="js/pages/orders.js"></script>
+  <script src="js/pages/reports.js"></script>
+  <script src="js/pages/users.js"></script>
+  <script src="js/pages/settings.js"></script>
 </body>
 </html>

@@ -1,0 +1,15 @@
+{
+  "name": "La Gran Familia — Grocery Corp.",
+  "short_name": "La Gran Familia",
+  "description": "Manage revenue, expenses, merchandise, payroll and order lists for La Gran Familia Deli & Market.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f8f9",
+  "theme_color": "#2f5d50",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-1024.png", "sizes": "1024x1024", "type": "image/png" }
+  ]
+}

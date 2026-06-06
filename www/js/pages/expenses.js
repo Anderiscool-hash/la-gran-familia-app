@@ -74,14 +74,21 @@ const expenses = {
   async add() {
     const desc = document.getElementById('exp-desc').value.trim();
     const amount = App.readMoney('exp-amount');
-    if (!desc || !amount) return;
+    if (!desc) { App.toast(t('description') + '?'); return; }
+    if (!amount) { App.toast(t('amount') + '?'); return; }
     const rec = this._formType === 'rec';
-    await DB.add('expenses', {
-      date: rec ? App.mondayISO() : document.getElementById('exp-date').value,
-      description: desc, amount, isRecurring: rec,
-      recurringDay: rec ? +document.getElementById('exp-day').value : null,
-      createdAt: new Date().toISOString(),
-    });
+    try {
+      await DB.add('expenses', {
+        date: rec ? App.mondayISO() : document.getElementById('exp-date').value,
+        description: desc, amount, isRecurring: rec,
+        recurringDay: rec ? +document.getElementById('exp-day').value : null,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Expense save failed:', err);
+      App.toast((err && err.message) ? err.message : 'Save failed');
+      return;
+    }
     this._formType = 'one';
     App.closeSheet(); App.refresh(); App.toast(t('save_expense'));
   },

@@ -5,10 +5,21 @@ async function getWeekStats() {
     DB.getAll('employees'), DB.getAll('deductions'),
   ]);
   const rev = [...revenue].sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
-  const monIso = App.mondayISO();
-  const prevMon = (() => { const d = App.weekBounds().monday; d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
-  const weekRev = rev.find(r => r.weekStart === monIso) || { amount: 0, cash: 0, credit: 0 };
-  const prevRev = rev.find(r => r.weekStart === prevMon) || { amount: 0 };
+  // Revenue is entered per-day, so sum every entry that falls in the week
+  // (Mon–Sun) rather than matching a single Monday-dated row.
+  const { monday, sunday } = App.weekBounds();
+  const prevMonday = new Date(monday); prevMonday.setDate(monday.getDate() - 7);
+  const prevSunday = new Date(monday); prevSunday.setDate(monday.getDate() - 1); prevSunday.setHours(23, 59, 59, 999);
+  const inRange = (iso, from, to) => { const d = new Date((iso || '').length === 10 ? iso + 'T00:00:00' : iso); return d >= from && d <= to; };
+  const sumRev = list => list.reduce((s, r) => s + (+r.amount || 0), 0);
+  const thisWeekRev = revenue.filter(r => inRange(r.weekStart, monday, sunday));
+  const prevWeekRev = revenue.filter(r => inRange(r.weekStart, prevMonday, prevSunday));
+  const weekRev = {
+    amount: sumRev(thisWeekRev),
+    cash: thisWeekRev.reduce((s, r) => s + (+r.cash || 0), 0),
+    credit: thisWeekRev.reduce((s, r) => s + (+r.credit || 0), 0),
+  };
+  const prevRev = { amount: sumRev(prevWeekRev) };
   const weekExpenses = expenses.filter(e => !e.isRecurring && App.inThisWeek(e.date)).reduce((s, e) => s + (+e.amount), 0);
   const weekMerch = merchandise.filter(m => App.inThisWeek(m.date)).reduce((s, m) => s + (+m.amount), 0);
   const grossPay = employees.reduce((s, e) => s + (+e.weeklyPay || 0), 0);
@@ -20,7 +31,7 @@ async function getWeekStats() {
   const netProfit = moneyIn - costs;
   const revDelta = prevRev.amount ? ((weekRev.amount - prevRev.amount) / prevRev.amount) * 100 : null;
   const margin = moneyIn ? (netProfit / moneyIn) * 100 : 0;
-  return { revenue, expenses, merchandise, employees, deductions, rev, weekRev, prevRev,
+  return { revenue, expenses, merchandise, employees, deductions, rev, weekRev, prevRev, thisWeekRev,
     weekExpenses, weekMerch, grossPay, totalDed, netPayroll, monthlyOH, moneyIn, costs, netProfit, revDelta, margin };
 }
 
@@ -61,7 +72,7 @@ const dashboard = {
     const recent = [
       ...c.expenses.filter(e => !e.isRecurring).map(e => ({ icon: 'expenses', tone: 'neg', title: e.description, date: e.date, amount: -e.amount })),
       ...c.merchandise.map(m => ({ icon: 'merchandise', tone: 'info', title: m.vendorName, date: m.date, amount: -m.amount })),
-      ...(c.weekRev.amount ? [{ icon: 'revenue', tone: 'pos', title: t('revenue'), date: c.weekRev.weekStart, amount: c.weekRev.amount }] : []),
+      ...c.thisWeekRev.map(r => ({ icon: 'revenue', tone: 'pos', title: t('revenue'), date: r.weekStart, amount: +r.amount })),
     ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
 
     const metricCells = [

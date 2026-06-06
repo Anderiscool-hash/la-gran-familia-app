@@ -36,7 +36,7 @@ const revenue = {
           ${rows.length ? rows.map(r => `<div class="row">
             ${App.iconChip('calendar', 'neutral')}
             <div class="r-main">
-              <div class="r-title">${t('week_of')} ${App.fmtDateShort(r.weekStart)}</div>
+              <div class="r-title">${App.fmtDateShort(r.weekStart)}</div>
               <div class="r-sub">${t('cash')} ${App.fmtMoney0(r.cash || 0)} · ${t('card')} ${App.fmtMoney0(r.credit || 0)}</div>
             </div>
             <div style="display:flex;align-items:center;gap:10px">
@@ -49,10 +49,26 @@ const revenue = {
     </div>`;
   },
 
-  formHTML() {
+  // Open the form with the date pre-set to the day AFTER the most recent entry,
+  // so revenue isn't entered for the same day twice. See App.openForm('revenue').
+  async openAddForm() {
+    const rows = await DB.getAll('revenue');
+    const last = rows.map(r => r.weekStart).filter(Boolean).sort().pop();
+    let def;
+    if (last) {
+      const d = new Date(last + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      def = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    } else {
+      const n = new Date();
+      def = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    }
+    App.openSheet({ title: t('add_revenue'), body: this.formHTML(def), onMount: () => this.formMount() });
+  },
+  formHTML(defaultDate) {
     return `<div style="padding-bottom:8px">
-      <div class="field"><label class="lbl">${t('week_starting')}</label>
-        <input class="in" type="date" id="rev-week" value="${App.mondayISO()}"></div>
+      <div class="field"><label class="lbl">${t('date')}</label>
+        <input class="in" type="date" id="rev-week" value="${defaultDate || App.mondayISO()}"></div>
       <div class="grid-2">
         <div class="field"><label class="lbl">${t('cash')}</label>${App.moneyField('rev-cash')}</div>
         <div class="field"><label class="lbl">${t('card')}</label>${App.moneyField('rev-credit')}</div>

@@ -51,7 +51,7 @@ const reports = {
         <div class="card flush">
           ${c.rev.length ? c.rev.map(r => `<div class="row">
             ${App.iconChip('calendar', 'neutral', { sm: true, icon: 16 })}
-            <div class="r-main"><div class="r-title">${t('week_of')} ${App.fmtDateShort(r.weekStart)}</div>
+            <div class="r-main"><div class="r-title">${App.fmtDateShort(r.weekStart)}</div>
               <div class="r-sub">${r.notes ? App.esc(r.notes) : `${t('cash')} / ${t('card')}`}</div></div>
             <span class="money c-pos" style="font-size:14.5px">${App.fmtMoney(r.amount)}</span></div>`).join('') : App.emptyState('revenue', 'no_revenue')}
         </div></div>

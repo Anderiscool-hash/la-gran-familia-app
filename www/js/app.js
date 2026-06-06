@@ -216,6 +216,7 @@ const App = (() => {
   // Open a specific add-form sheet (also used by each page's Add button)
   async function openForm(kind) {
     if (kind === 'merch') { await merchandise.openAddForm(); return; }
+    if (kind === 'revenue') { await revenue.openAddForm(); return; }
     const map = {
       revenue:  { title: t('add_revenue'),  build: () => revenue.formHTML(),  mount: () => revenue.formMount && revenue.formMount() },
       expense:  { title: t('add_expense'),  build: () => expenses.formHTML() },

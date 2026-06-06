@@ -28,12 +28,6 @@ A mobile app for managing **La Gran Familia Deli & Market** — built with Capac
 
 ---
 
-## Default Login
-
-| Username | Password  | Role  |
-|----------|-----------|-------|
-| `admin`  | `admin123` | Admin |
-
 > Change the password after first login in the Users tab.
 
 ---

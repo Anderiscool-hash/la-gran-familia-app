@@ -24,7 +24,8 @@ const TRANSLATIONS = {
     where_money_goes:'Where the money goes', recent_activity:'Recent activity',
     cash_split:'Cash vs Card', this_week:'This Week', week_of:'Week of',
     log_revenue:'Log revenue', log_expense:'Log expense', vs_last:'vs last week',
-    avg_week:'Avg / week',
+    avg_week:'Avg / week', selected_week_revenue:'Selected Week Revenue',
+    payroll_left_next:'Payroll Left for Next Week',
     // Revenue
     add_revenue:'Add Revenue', week_starting:'Week starting (Monday)',
     save_revenue:'Save Revenue', no_revenue:'No revenue entries yet.',
@@ -99,7 +100,8 @@ const TRANSLATIONS = {
     where_money_goes:'A dónde va el dinero', recent_activity:'Actividad reciente',
     cash_split:'Efectivo vs Tarjeta', this_week:'Esta Semana', week_of:'Semana del',
     log_revenue:'Registrar ingreso', log_expense:'Registrar gasto', vs_last:'vs semana pasada',
-    avg_week:'Prom. / semana',
+    avg_week:'Prom. / semana', selected_week_revenue:'Ingresos de la Semana',
+    payroll_left_next:'Nómina Restante para la Próxima Semana',
     // Revenue
     add_revenue:'Agregar Ingresos', week_starting:'Semana que inicia (lunes)',
     save_revenue:'Guardar Ingresos', no_revenue:'Sin ingresos registrados.',

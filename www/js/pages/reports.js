@@ -27,7 +27,7 @@ const reports = {
 
       <div class="card rise" style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div><div class="metric-label">${t('net_profit')} · ${t('this_week')}</div>
+          <div><div class="metric-label">${t('net_profit')} · ${App.selectedWeekLabel()}</div>
             <span class="money ${profitClass}" style="font-size:32px;display:block;margin-top:6px">${App.fmtMoney(Math.abs(c.netProfit))}</span></div>
           <div style="text-align:right;padding-top:2px">${App.delta(c.margin)}
             <div style="font-size:11px;color:var(--faint);margin-top:5px">${t('profit_margin')}</div></div>

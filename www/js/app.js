@@ -5,6 +5,7 @@
 const App = (() => {
   let currentPage = 'dashboard';
   let detail = null;              // { title, parentTab, render(), mount?() }
+  let selectedMonday = getMonday(new Date());
 
   const TABS = [
     { key: 'dashboard', icon: 'home',     label: 'home' },
@@ -14,7 +15,7 @@ const App = (() => {
     { key: 'more',      icon: 'more',     label: 'more' },
   ];
   const TAB_KEYS   = ['dashboard', 'revenue', 'expenses', 'orders'];
-  const WEEK_PAGES = ['dashboard', 'revenue', 'expenses'];
+  const WEEK_PAGES = ['dashboard', 'revenue', 'expenses', 'reports'];
   const MORE_ITEMS = [
     { key: 'merchandise', icon: 'merchandise', tone: 'info' },
     { key: 'employees',   icon: 'employees',   tone: 'brand' },
@@ -138,14 +139,23 @@ const App = (() => {
   function weekBarHTML() {
     const { monday, sunday } = weekBounds();
     const fmt = d => d.toLocaleDateString(lang() === 'es' ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric' });
+    const label = isCurrentWeek() ? t('this_week') : t('week_of');
     return `<div class="week-bar"><div class="week-inner">
-      <span class="arrow">${icon('chevronLeft', { size: 17 })}</span>
+      <button class="arrow" onclick="App.shiftWeek(-1)" aria-label="${t('back')}">${icon('chevronLeft', { size: 17 })}</button>
       <span class="lbl-mid">${icon('calendar', { size: 15, cls: 'c-brand' })}
-        <span style="font-size:13.5px;font-weight:600">${t('this_week')}</span>
+        <span style="font-size:13.5px;font-weight:600">${label}</span>
         <span class="num" style="font-size:13.5px;color:var(--muted)">· ${fmt(monday)} – ${fmt(sunday)}</span>
       </span>
-      <span class="arrow">${icon('chevronRight', { size: 17 })}</span>
+      <button class="arrow" onclick="App.shiftWeek(1)" aria-label="${t('this_week')}" ${isCurrentWeek() ? 'disabled' : ''}>${icon('chevronRight', { size: 17 })}</button>
     </div></div>`;
+  }
+
+  async function shiftWeek(delta) {
+    selectedMonday = addDays(selectedMonday, delta * 7);
+    const current = getMonday(new Date());
+    if (selectedMonday > current) selectedMonday = current;
+    renderHeader();
+    await refresh();
   }
 
   function updateNav(activeTab) {
@@ -297,17 +307,36 @@ const App = (() => {
   function fmtDate(d) { if (!d) return '—'; return new Date(d.length === 10 ? d + 'T00:00:00' : d).toLocaleDateString(lang() === 'es' ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
   function fmtDateShort(d) { if (!d) return '—'; return new Date(d.length === 10 ? d + 'T00:00:00' : d).toLocaleDateString(lang() === 'es' ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric' }); }
 
-  function weekBounds() {
-    const now = new Date();
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
+  function getMonday(date) {
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1));
     monday.setHours(0, 0, 0, 0);
+    return monday;
+  }
+  function addDays(date, days) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  function isoDate(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+  function isCurrentWeek() {
+    return isoDate(selectedMonday) === isoDate(getMonday(new Date()));
+  }
+  function weekBounds(offsetWeeks) {
+    const monday = addDays(selectedMonday, (offsetWeeks || 0) * 7);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
     return { monday, sunday };
   }
-  function mondayISO() { return weekBounds().monday.toISOString().slice(0, 10); }
+  function mondayISO() { return isoDate(weekBounds().monday); }
+  function selectedWeekLabel() {
+    const { monday, sunday } = weekBounds();
+    return `${fmtDateShort(isoDate(monday))} - ${fmtDateShort(isoDate(sunday))}`;
+  }
   function inThisWeek(iso) {
     const { monday, sunday } = weekBounds();
     const d = new Date((iso || '').length === 10 ? iso + 'T00:00:00' : iso);
@@ -345,9 +374,10 @@ const App = (() => {
   return {
     nav, openDetail, refresh, back, boot, login,
     openSheet, closeSheet, openMore, openQuickAdd, openForm, toast,
+    shiftWeek,
     setTheme, setLang, setAccent, signOut, applyAccent, ACCENTS,
     getCurrentPage, lang, fmtMoney, fmtMoney0, fmtK, fmtDate, fmtDateShort,
-    weekBounds, mondayISO, inThisWeek, esc, initials, avTone,
+    weekBounds, mondayISO, selectedWeekLabel, inThisWeek, esc, initials, avTone,
     iconChip, avatar, badge, delta, moneyField, sectionHead, emptyState, readMoney,
   };
 })();

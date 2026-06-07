@@ -4,10 +4,12 @@ const expenses = {
 
   async render() {
     const all = (await DB.getAll('expenses')).sort((a, b) => new Date(b.date) - new Date(a.date));
-    let rows = all;
-    if (this._filter === 'one') rows = all.filter(e => !e.isRecurring);
-    if (this._filter === 'rec') rows = all.filter(e => e.isRecurring);
-    const total = all.reduce((s, e) => s + (+e.amount), 0);
+    const weekOneTime = all.filter(e => !e.isRecurring && App.inThisWeek(e.date));
+    const recurring = all.filter(e => e.isRecurring);
+    let rows = [...weekOneTime, ...recurring].sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (this._filter === 'one') rows = weekOneTime;
+    if (this._filter === 'rec') rows = recurring;
+    const total = weekOneTime.reduce((s, e) => s + (+e.amount), 0);
     const oh = all.filter(e => e.isRecurring).reduce((s, e) => s + (+e.amount), 0);
     const seg = (k, lbl) => `<button class="${this._filter === k ? 'active' : ''}" onclick="expenses.setFilter('${k}')">${lbl}</button>`;
 
@@ -15,7 +17,7 @@ const expenses = {
       <div class="grid-2 rise">
         <div class="card">
           <div style="margin-bottom:9px">${App.iconChip('expenses', 'neg', { sm: true, icon: 17 })}</div>
-          <div class="metric-label">${t('total_expenses')}</div>
+          <div class="metric-label">${t('total_expenses')} · ${App.selectedWeekLabel()}</div>
           <span class="money c-text" style="font-size:22px">${App.fmtMoney(total)}</span>
         </div>
         <div class="card">

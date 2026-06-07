@@ -20,11 +20,20 @@ async function getWeekStats() {
     credit: thisWeekRev.reduce((s, r) => s + (+r.credit || 0), 0),
   };
   const prevRev = { amount: sumRev(prevWeekRev) };
-  const weekExpenses = expenses.filter(e => !e.isRecurring && App.inThisWeek(e.date)).reduce((s, e) => s + (+e.amount), 0);
-  const weekMerch = merchandise.filter(m => App.inThisWeek(m.date)).reduce((s, m) => s + (+m.amount), 0);
+  const weekExpenseRows = expenses.filter(e => !e.isRecurring && inRange(e.date, monday, sunday));
+  const weekMerchRows = merchandise.filter(m => inRange(m.date, monday, sunday));
+  const weekExpenses = weekExpenseRows.reduce((s, e) => s + (+e.amount), 0);
+  const weekMerch = weekMerchRows.reduce((s, m) => s + (+m.amount), 0);
   const grossPay = employees.reduce((s, e) => s + (+e.weeklyPay || 0), 0);
   const totalDed = deductions.reduce((s, d) => s + (+d.amount || 0), 0);
   const netPayroll = grossPay - totalDed;
+  const payrollCarry = employees
+    .map((e, i) => {
+      const employeeDeductions = deductions.filter(d => d.employeeId === e.id).reduce((s, d) => s + (+d.amount || 0), 0);
+      const left = Math.max(0, (+e.weeklyPay || 0) - employeeDeductions);
+      return { ...e, tone: App.avTone(i), deductions: employeeDeductions, left };
+    })
+    .sort((a, b) => b.left - a.left);
   const monthlyOH = expenses.filter(e => e.isRecurring).reduce((s, e) => s + (+e.amount), 0);
   const moneyIn = +weekRev.amount || 0;
   const costs = weekExpenses + weekMerch + netPayroll;
@@ -32,7 +41,8 @@ async function getWeekStats() {
   const revDelta = prevRev.amount ? ((weekRev.amount - prevRev.amount) / prevRev.amount) * 100 : null;
   const margin = moneyIn ? (netProfit / moneyIn) * 100 : 0;
   return { revenue, expenses, merchandise, employees, deductions, rev, weekRev, prevRev, thisWeekRev,
-    weekExpenses, weekMerch, grossPay, totalDed, netPayroll, monthlyOH, moneyIn, costs, netProfit, revDelta, margin };
+    weekExpenseRows, weekMerchRows, weekExpenses, weekMerch, grossPay, totalDed, netPayroll, payrollCarry,
+    monthlyOH, moneyIn, costs, netProfit, revDelta, margin };
 }
 
 const dashboard = {
@@ -54,24 +64,32 @@ const dashboard = {
       <span style="flex:${c.weekExpenses};background:var(--neg)"></span>
     </div>`;
 
-    // trend — last 5 weeks
-    const trend = [...c.rev].sort((a, b) => new Date(a.weekStart) - new Date(b.weekStart)).slice(-5);
+    // trend — selected week and the 4 before it
+    const trend = Array.from({ length: 5 }, (_, i) => {
+      const offset = i - 4;
+      const { monday, sunday } = App.weekBounds(offset);
+      const rows = c.revenue.filter(r => {
+        const d = new Date((r.weekStart || '').length === 10 ? r.weekStart + 'T00:00:00' : r.weekStart);
+        return d >= monday && d <= sunday;
+      });
+      return { date: monday, amount: rows.reduce((s, r) => s + (+r.amount || 0), 0) };
+    });
     const maxT = Math.max(...trend.map(r => +r.amount), 1);
     const bars = trend.map((r, i) => {
-      const last = i === trend.length - 1;
+      const selected = i === trend.length - 1;
       const h = Math.max(6, (+r.amount / maxT) * 74);
-      const lbl = new Date(r.weekStart + 'T00:00:00').toLocaleDateString(App.lang() === 'es' ? 'es-MX' : 'en-US', { day: 'numeric' });
+      const lbl = r.date.toLocaleDateString(App.lang() === 'es' ? 'es-MX' : 'en-US', { day: 'numeric' });
       return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
-        <div class="num" style="font-size:10.5px;font-weight:600;color:${last ? 'var(--brand)' : 'var(--faint)'}">${App.fmtK(r.amount)}</div>
-        <div style="width:100%;max-width:30px;height:${h}px;border-radius:7px;background:${last ? 'var(--brand)' : 'var(--border)'}"></div>
+        <div class="num" style="font-size:10.5px;font-weight:600;color:${selected ? 'var(--brand)' : 'var(--faint)'}">${App.fmtK(r.amount)}</div>
+        <div style="width:100%;max-width:30px;height:${h}px;border-radius:7px;background:${selected ? 'var(--brand)' : 'var(--border)'}"></div>
         <div style="font-size:10.5px;color:var(--faint);font-weight:500">${lbl}</div>
       </div>`;
     }).join('');
 
     // recent activity
     const recent = [
-      ...c.expenses.filter(e => !e.isRecurring).map(e => ({ icon: 'expenses', tone: 'neg', title: e.description, date: e.date, amount: -e.amount })),
-      ...c.merchandise.map(m => ({ icon: 'merchandise', tone: 'info', title: m.vendorName, date: m.date, amount: -m.amount })),
+      ...c.weekExpenseRows.map(e => ({ icon: 'expenses', tone: 'neg', title: e.description, date: e.date, amount: -e.amount })),
+      ...c.weekMerchRows.map(m => ({ icon: 'merchandise', tone: 'info', title: m.vendorName, date: m.date, amount: -m.amount })),
       ...c.thisWeekRev.map(r => ({ icon: 'revenue', tone: 'pos', title: t('revenue'), date: r.weekStart, amount: +r.amount })),
     ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
 
@@ -94,7 +112,7 @@ const dashboard = {
       <div class="card rise" style="display:flex;flex-direction:column;gap:16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
-            <div class="metric-label">${c.netProfit >= 0 ? t('net_profit') : t('net_loss')} · ${t('this_week')}</div>
+            <div class="metric-label">${c.netProfit >= 0 ? t('net_profit') : t('net_loss')} · ${App.selectedWeekLabel()}</div>
             <div style="display:flex;align-items:baseline;gap:10px;margin-top:6px">
               <span class="money ${profitClass}" style="font-size:38px">${App.fmtMoney(Math.abs(c.netProfit))}</span>
               ${App.delta(c.revDelta)}
@@ -112,6 +130,20 @@ const dashboard = {
 
       <div class="card rise" style="padding:0">
         <div class="grid-2">${metricCells}</div>
+      </div>
+
+      <div class="rise">
+        ${App.sectionHead('payroll_left_next')}
+        <div class="card flush">
+          ${c.payrollCarry.length ? c.payrollCarry.map(e => `<div class="row">
+            ${App.avatar(e.name, e.tone)}
+            <div class="r-main">
+              <div class="r-title">${App.esc(e.name)}</div>
+              <div class="r-sub">${t('weekly_pay')} ${App.fmtMoney0(e.weeklyPay)} · ${t('deductions')} ${App.fmtMoney0(e.deductions)}</div>
+            </div>
+            <span class="money ${e.left ? 'c-pos' : 'c-muted'}" style="font-size:15px">${App.fmtMoney(e.left)}</span>
+          </div>`).join('') : App.emptyState('employees', 'no_employees')}
+        </div>
       </div>
 
       <div class="rise">

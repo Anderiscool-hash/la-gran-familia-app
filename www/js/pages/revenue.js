@@ -1,16 +1,18 @@
 const revenue = {
   async render() {
     const rows = (await DB.getAll('revenue')).sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
-    const total  = rows.reduce((s, r) => s + (+r.amount), 0);
-    const cash   = rows.reduce((s, r) => s + (+r.cash || 0), 0);
-    const credit = rows.reduce((s, r) => s + (+r.credit || 0), 0);
+    const weekRows = rows.filter(r => App.inThisWeek(r.weekStart));
+    const total  = weekRows.reduce((s, r) => s + (+r.amount), 0);
+    const cash   = weekRows.reduce((s, r) => s + (+r.cash || 0), 0);
+    const credit = weekRows.reduce((s, r) => s + (+r.credit || 0), 0);
+    const allTotal = rows.reduce((s, r) => s + (+r.amount), 0);
     const splitTotal = cash + credit || 1;
 
     return `<div class="page">
       <div class="card rise" style="display:flex;flex-direction:column;gap:16px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
-            <div class="metric-label">${t('total_all_time')} · ${t('revenue')}</div>
+            <div class="metric-label">${t('revenue')} · ${App.selectedWeekLabel()}</div>
             <span class="money c-text" style="font-size:32px;display:block;margin-top:6px">${App.fmtMoney(total)}</span>
           </div>
           <div class="iconchip t-pos" style="width:42px;height:42px">${icon('revenue', { size: 22 })}</div>
@@ -26,14 +28,15 @@ const revenue = {
           ${substat('cash', 'cash', cash, 'c-pos')}
           ${substat('card', 'card', credit, 'c-info')}
         </div>
+        <div style="font-size:12.5px;color:var(--faint)">${t('total_all_time')}: <span class="money c-text">${App.fmtMoney(allTotal)}</span></div>
       </div>
 
       <button class="btn btn-brand btn-full" onclick="App.openForm('revenue')">${icon('plus', { size: 18 })}${t('add_revenue')}</button>
 
       <div class="rise">
-        ${App.sectionHead('all_revenue')}
+        ${App.sectionHead('selected_week_revenue')}
         <div class="card flush">
-          ${rows.length ? rows.map(r => `<div class="row">
+          ${weekRows.length ? weekRows.map(r => `<div class="row">
             ${App.iconChip('calendar', 'neutral')}
             <div class="r-main">
               <div class="r-title">${App.fmtDateShort(r.weekStart)}</div>

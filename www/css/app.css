@@ -95,7 +95,9 @@ svg { display: block; flex-shrink: 0; }
 .week-inner { display: flex; align-items: center; justify-content: space-between;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; padding: 9px 12px; }
 .week-inner .lbl-mid { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
-.week-inner .arrow { color: var(--faint); cursor: pointer; display: flex; }
+.week-inner .arrow { border: none; background: transparent; color: var(--faint); cursor: pointer; display: flex;
+  align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; }
+.week-inner .arrow:disabled { opacity: 0.35; cursor: default; }
 
 /* ── Scroll body ────────────────────────────────────────────────────────── */
 #pageContainer { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }

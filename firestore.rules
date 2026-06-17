@@ -26,6 +26,26 @@ service cloud.firestore {
         && request.resource.data.role == 'admin';
     }
 
+    function isSelfSignup(userId) {
+      return signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.username is string
+        && request.resource.data.email is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.name is string
+        && request.resource.data.createdAt is string
+        && request.resource.data.createdBy == null
+        && request.resource.data.eulaAcceptedAt is string
+        && request.resource.data.eulaVersion is string
+        && (
+          request.resource.data.role == 'worker'
+          || (
+            request.resource.data.role == 'admin'
+            && request.resource.data.adminAccessCode == 'Ander'
+          )
+        );
+    }
+
     match /orders/{orderId} {
       allow read, write: if isAdmin() || isWorker();
     }
@@ -33,7 +53,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
-      allow create: if isAdmin() || isOwnerBootstrap(userId);
+      allow create: if isAdmin() || isOwnerBootstrap(userId) || isSelfSignup(userId);
       allow update, delete: if isAdmin();
     }
 

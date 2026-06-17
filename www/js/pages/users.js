@@ -49,28 +49,51 @@ const users = {
     return `<div style="padding-bottom:8px">
       <div class="field"><label class="lbl">${t('full_name')}</label><input class="in" id="usr-name" placeholder="${t('full_name')}"></div>
       <div class="field"><label class="lbl">${t('username')}</label><input class="in" id="usr-username" autocapitalize="none"></div>
+      <div class="field"><label class="lbl">${t('email')}</label><input class="in" id="usr-email" type="email" autocapitalize="none" autocomplete="email" placeholder="${t('email')}"></div>
       <div class="field"><label class="lbl">${t('new_password')}</label><input class="in" id="usr-pass" type="password" placeholder="••••"></div>
       <div class="field"><label class="lbl">${t('role')}</label>
         <div class="segmented" id="usr-role-seg">
           <button class="active" data-v="worker" onclick="users.pickRole('worker')">${t('worker')}</button>
           <button data-v="admin" onclick="users.pickRole('admin')">${t('admin')}</button>
         </div></div>
+      <div class="field" id="usr-admin-code-wrap" style="display:none">
+        <label class="lbl">${t('admin_access_code')}</label>
+        <input class="in" id="usr-admin-code" type="password" autocomplete="off" placeholder="${t('admin_access_code')}">
+      </div>
       <button class="btn btn-brand btn-full" onclick="users.create()">${icon('check', { size: 18 })}${t('add_user')}</button>
     </div>`;
   },
-  pickRole(r) { this._role = r; document.querySelectorAll('#usr-role-seg button').forEach(b => b.classList.toggle('active', b.dataset.v === r)); },
+  pickRole(r) {
+    this._role = r;
+    document.querySelectorAll('#usr-role-seg button').forEach(b => b.classList.toggle('active', b.dataset.v === r));
+    const code = document.getElementById('usr-admin-code-wrap');
+    if (code) code.style.display = r === 'admin' ? 'block' : 'none';
+  },
   async create() {
     const name = document.getElementById('usr-name').value.trim();
-    const username = document.getElementById('usr-username').value.trim();
-    if (!name || !username) return;
+    const username = Auth.cleanUsername(document.getElementById('usr-username').value);
+    const email = Auth.cleanEmail(document.getElementById('usr-email').value);
+    if (!name || !username || !email) return;
+    if (!email.includes('@')) {
+      App.toast(t('invalid_email'));
+      return;
+    }
     let role = this._role;
+    const adminAccessCode = document.getElementById('usr-admin-code') ? document.getElementById('usr-admin-code').value.trim() : '';
     if (role === 'admin') {
+      if (!Auth.canCreateAdmin(adminAccessCode)) {
+        App.toast(t('invalid_admin_code'));
+        return;
+      }
       const adminCount = (await DB.getAll('users')).filter(u => u.role === 'admin').length;
-      if (adminCount >= 3) role = 'worker';
+      if (adminCount >= 3) {
+        App.toast(t('admin_limit_reached'));
+        return;
+      }
     }
     const password = document.getElementById('usr-pass').value || 'changeme';
-    if (Auth.isConfigured()) await Auth.createUser({ name, username, password, role });
-    else await DB.add('users', { name, username, password, role, createdAt: new Date().toISOString() });
+    if (Auth.isConfigured()) await Auth.createUser({ name, username, email, password, role, adminAccessCode });
+    else await DB.add('users', { name, username, email, password, role, createdAt: new Date().toISOString() });
     App.closeSheet(); App.refresh(); App.toast(t('add_user'));
   },
   async del(id) { await DB.delete('users', id); App.refresh(); },

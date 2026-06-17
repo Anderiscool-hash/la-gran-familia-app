@@ -6,6 +6,7 @@ const App = (() => {
   let currentPage = 'dashboard';
   let detail = null;              // { title, parentTab, render(), mount?() }
   let selectedMonday = getMonday(new Date());
+  let signupRole = 'worker';
 
   const TABS = [
     { key: 'dashboard', icon: 'home',     label: 'home' },
@@ -278,9 +279,11 @@ const App = (() => {
         <h1>${t('app_name')}</h1>
         <p>${t('sign_in_sub')}</p>
         ${error ? `<div class="auth-error">${App.esc(error)}</div>` : ''}
-        <div class="field"><label class="lbl">${t('username')}</label><input class="in" id="login-username" autocapitalize="none" autocomplete="username" required></div>
+        <div class="field"><label class="lbl">${t('username_or_email')}</label><input class="in" id="login-username" autocapitalize="none" autocomplete="username" required></div>
         <div class="field"><label class="lbl">${t('password')}</label><input class="in" id="login-password" type="password" autocomplete="current-password" required></div>
         <button class="btn btn-brand btn-full" type="submit">${icon('key', { size: 18 })}${t('sign_in')}</button>
+        <button class="btn btn-ghost btn-full" type="button" style="margin-top:10px" onclick="App.openSignup()">${icon('plus', { size: 18 })}${t('create_account')}</button>
+        <button class="btn btn-soft btn-full" type="button" style="margin-top:10px" onclick="App.openPasswordReset()">${icon('key', { size: 18 })}${t('reset_password')}</button>
       </form>
     </div>`;
   }
@@ -294,6 +297,142 @@ const App = (() => {
       await boot();
     } catch (err) {
       renderLogin(t('invalid_login'));
+    }
+  }
+
+  function openSignup() {
+    signupRole = 'worker';
+    openSheet({ title: t('create_account'), body: signupHTML() });
+  }
+
+  function openPasswordReset() {
+    openSheet({ title: t('reset_password'), body: passwordResetHTML() });
+  }
+
+  function passwordResetHTML() {
+    return `<div style="padding-bottom:8px">
+      <div class="field"><label class="lbl">${t('email')}</label><input class="in" id="reset-email" type="email" autocapitalize="none" autocomplete="email" placeholder="${t('email')}"></div>
+      ${Auth.isConfigured() ? `<div class="auth-note" style="margin-bottom:14px">${t('firebase_reset_note')}</div>` : `<div class="field"><label class="lbl">${t('new_password')}</label><input class="in" id="reset-pass" type="password" autocomplete="new-password" placeholder="••••••"></div>`}
+      <button class="btn btn-brand btn-full" onclick="App.resetPassword()">${icon('check', { size: 18 })}${t('reset_password')}</button>
+    </div>`;
+  }
+
+  function signupHTML() {
+    return `<div style="padding-bottom:8px">
+      <div class="field"><label class="lbl">${t('full_name')}</label><input class="in" id="signup-name" placeholder="${t('full_name')}"></div>
+      <div class="field"><label class="lbl">${t('username')}</label><input class="in" id="signup-username" autocapitalize="none" autocomplete="username"></div>
+      <div class="field"><label class="lbl">${t('email')}</label><input class="in" id="signup-email" type="email" autocapitalize="none" autocomplete="email" placeholder="${t('email')}"></div>
+      <div class="field"><label class="lbl">${t('password')}</label><input class="in" id="signup-pass" type="password" autocomplete="new-password" placeholder="••••••"></div>
+      <div class="field"><label class="lbl">${t('role')}</label>
+        <div class="segmented" id="signup-role-seg">
+          <button class="active" data-v="worker" onclick="App.pickSignupRole('worker')">${t('worker')}</button>
+          <button data-v="admin" onclick="App.pickSignupRole('admin')">${t('admin')}</button>
+        </div></div>
+      <div class="field" id="signup-admin-code-wrap" style="display:none">
+        <label class="lbl">${t('admin_access_code')}</label>
+        <input class="in" id="signup-admin-code" type="password" autocomplete="off" placeholder="${t('admin_access_code')}">
+      </div>
+      <label style="display:flex;align-items:flex-start;gap:10px;margin:4px 0 16px;color:var(--muted);font-size:13px;line-height:1.35">
+        <input id="signup-eula" type="checkbox" style="width:18px;height:18px;margin-top:0;accent-color:var(--brand)">
+        <span>${t('eula_agree')}</span>
+      </label>
+      <button class="btn btn-brand btn-full" onclick="App.signup()">${icon('check', { size: 18 })}${t('create_account')}</button>
+    </div>`;
+  }
+
+  function pickSignupRole(role) {
+    signupRole = role;
+    document.querySelectorAll('#signup-role-seg button').forEach(b => b.classList.toggle('active', b.dataset.v === role));
+    const code = document.getElementById('signup-admin-code-wrap');
+    if (code) code.style.display = role === 'admin' ? 'block' : 'none';
+  }
+
+  async function signup() {
+    const name = document.getElementById('signup-name').value.trim();
+    const username = Auth.cleanUsername(document.getElementById('signup-username').value);
+    const email = Auth.cleanEmail(document.getElementById('signup-email').value);
+    const password = document.getElementById('signup-pass').value;
+    const adminAccessCode = document.getElementById('signup-admin-code') ? document.getElementById('signup-admin-code').value.trim() : '';
+    const eulaAccepted = !!(document.getElementById('signup-eula') && document.getElementById('signup-eula').checked);
+    let role = signupRole;
+    if (!name || !username || !email || !password) {
+      toast(t('complete_required_fields'));
+      return;
+    }
+    if (!eulaAccepted) {
+      toast(t('eula_required'));
+      return;
+    }
+    if (!email.includes('@')) {
+      toast(t('invalid_email'));
+      return;
+    }
+    if (role === 'admin') {
+      if (!Auth.canCreateAdmin(adminAccessCode)) {
+        toast(t('invalid_admin_code'));
+        return;
+      }
+    }
+    try {
+      const eulaAcceptedAt = new Date().toISOString();
+      if (Auth.isConfigured()) {
+        await Auth.signUp({ name, username, email, password, role, adminAccessCode, eulaAcceptedAt });
+      } else {
+        await DB.add('users', { name, username, email, password, role, eulaAcceptedAt, eulaVersion: '1.0', createdAt: new Date().toISOString() });
+      }
+      closeSheet();
+      toast(t('account_created'));
+      await boot();
+    } catch (err) {
+      console.error('Account creation failed:', err);
+      toast(accountCreateMessage(err));
+    }
+  }
+
+  function accountCreateMessage(err) {
+    if (!err) return t('account_create_failed');
+    if (err.code === 'permission-denied') return t('signup_rules_needed');
+    if (err.code === 'auth/email-already-in-use') return t('account_exists_reset');
+    if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') return t('account_exists_reset');
+    if (err.code === 'auth/invalid-email') return t('invalid_email');
+    if (err.code === 'auth/weak-password') return t('weak_password');
+    return err.message || t('account_create_failed');
+  }
+
+  async function resetPassword() {
+    const email = Auth.cleanEmail(document.getElementById('reset-email').value);
+    if (!email) {
+      toast(t('complete_required_fields'));
+      return;
+    }
+    if (!email.includes('@')) {
+      toast(t('invalid_email'));
+      return;
+    }
+    try {
+      if (Auth.isConfigured()) {
+        await Auth.sendPasswordReset(email);
+        closeSheet();
+        toast(t('password_reset_sent'));
+        return;
+      }
+      const newPassword = document.getElementById('reset-pass').value;
+      if (!newPassword) {
+        toast(t('complete_required_fields'));
+        return;
+      }
+      const rows = await DB.getAll('users');
+      const user = rows.find(u => Auth.cleanEmail(u.email) === email);
+      if (!user) {
+        toast(t('invalid_login'));
+        return;
+      }
+      await DB.put('users', { ...user, email, password: newPassword });
+      closeSheet();
+      toast(t('password_updated'));
+    } catch (err) {
+      console.error('Password reset failed:', err);
+      toast(err && err.message ? err.message : t('password_reset_failed'));
     }
   }
 
@@ -373,6 +512,7 @@ const App = (() => {
 
   return {
     nav, openDetail, refresh, back, boot, login,
+    openSignup, pickSignupRole, signup, openPasswordReset, resetPassword,
     openSheet, closeSheet, openMore, openQuickAdd, openForm, toast,
     shiftWeek,
     setTheme, setLang, setAccent, signOut, applyAccent, ACCENTS,
